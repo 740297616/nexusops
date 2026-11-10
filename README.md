@@ -4,7 +4,7 @@ NexusOps 是一个自托管基础设施管理平台，计划统一查看和管�
 
 ## 当前状态
 
-Phase 0 仅包含产品和架构文档及目录骨架，没有可运行的应用、数据库或部署配置。请勿将本文档中的设计视为已实现功能。
+Phase 1.1 提供 Web 工程骨架和 Server 健康检查；尚未实现业务功能、数据库或部署配置。请勿将设计文档中的目标视为已实现功能。
 
 ## 技术方向
 
@@ -21,9 +21,9 @@ Server 负责认证、API、业务逻辑与数据库；Agent 负责主机信息�
 - [ARCHITECTURE.md](ARCHITECTURE.md)：组件边界、通信与安全设计
 - [DATABASE.md](DATABASE.md)：数据模型、迁移与保留策略
 - [AGENTS.md](AGENTS.md)：AI 协作与工程规范
-- `web/`、`server/`、`agent/`：各组件预留目录
+- `web/`、`server/`：前端与 Server 工程；`agent/` 为预留目录
 - `deploy/`、`docs/`、`scripts/`：部署、补充文档和脚本预留目录
 
 ## 开发
 
-当前尚无依赖、构建或测试命令。`make help` 仅展示阶段状态；后续初始化各组件时须补齐可执行的测试、构建和部署说明。使用许可尚待项目所有者确定，参见 [LICENSE](LICENSE)。
+分别参见 [Web 开发说明](web/README.md) 和 [Server 开发说明](server/README.md)。本阶段不包含数据库、Agent 通信或 Docker Compose。使用许可尚待项目所有者确定，参见 [LICENSE](LICENSE)。
