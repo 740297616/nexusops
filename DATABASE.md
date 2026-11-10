@@ -8,7 +8,11 @@
 
 当前要求 PostgreSQL 16+，使用 GORM 和 Goose。Server 启动时建立并检查唯一的共享连接池；连接配置、池大小、生命周期和超时通过环境变量设置。关闭 Server 时释放连接；未来 Repository 使用共享 GORM 句柄和数据库模块提供的事务入口。GORM 错误翻译已启用，默认不记录 SQL 或连接详情，调用方应处理错误且不得将底层详情返回客户端。
 
-迁移以编号 SQL 文件存放在 `server/migrations/`，随迁移命令嵌入，使用 `go run ./cmd/migrate up|down|status` 管理。Server 不自动迁移。Goose 的版本表记录已应用状态，重复 `up` 不会重复应用版本；同一数据库的迁移操作须串行执行。首个迁移仅以 `SELECT 1` 验证机制，回滚同样不改变业务数据；Goose 版本表是唯一新增的持久表。数据库初始化、环境变量及隔离集成测试见 [Server 说明](server/README.md)。
+迁移以编号 SQL 文件存放在 `server/migrations/`，随迁移命令嵌入，使用 `go run ./cmd/migrate up|down|status` 管理。Server 不自动迁移。Goose 的版本表记录已应用状态，重复 `up` 不会重复应用版本；同一数据库的迁移操作须串行执行。首个迁移仅以 `SELECT 1` 验证机制。`00002_auth.sql` 创建用户、认证会话和刷新令牌历史；回滚该迁移会永久删除所有用户和会话，须先备份并评估影响。数据库初始化、环境变量及隔离集成测试见 [Server 说明](server/README.md)。
+
+## 认证数据
+
+`users` 保存唯一的小写用户名、Argon2id 密码哈希、显示名、状态、角色和时间戳。`auth_sessions` 保存 Access Token 的 SHA-256 摘要、有效期、用户和撤销状态；`auth_refresh_tokens` 保存 Refresh Token 摘要、所属会话、有效期和消费时间。令牌由加密随机源生成，不持久化明文。刷新在事务中锁定令牌与会话，轮换令牌；已消费且尚未过期的令牌被重放时撤销整个会话。会话最长 7 天，相关过期及撤销记录当前不会自动清理，部署时需监控增长并规划保留策略。
 
 ## 初步领域模型
 

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/740297616/nexusops/server/internal/api"
+	"github.com/740297616/nexusops/server/internal/auth"
 	"github.com/740297616/nexusops/server/internal/config"
 	"github.com/740297616/nexusops/server/internal/database"
 )
@@ -31,9 +32,15 @@ func run() error {
 		return err
 	}
 	defer db.Close()
+	authService, err := auth.NewService(auth.NewRepository(db.GORM()))
+	if err != nil {
+		return err
+	}
+	router := api.NewRouter(cfg.Version, db.Ping)
+	auth.RegisterRoutes(router, authService)
 	server := &http.Server{
 		Addr:              cfg.Address,
-		Handler:           api.NewRouter(cfg.Version, db.Ping),
+		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	log.Printf("starting server on %s", cfg.Address)

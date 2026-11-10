@@ -23,6 +23,14 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build
 
 回滚最近一次迁移使用相同 `run` 命令加 `down`。迁移不会随 Server 自动运行；同一数据库必须由一个操作者串行执行迁移。回滚前检查数据影响并备份。首次启动已存在的 PostgreSQL 数据卷后，修改 `DB_USER`、`DB_PASSWORD` 或 `DB_NAME` 不会自动修改数据库内的角色或库；请通过 PostgreSQL 管理流程修改并同步配置。
 
+应用迁移后，在当前 shell 安全设置 `NEXUSOPS_ADMIN_USER`、`NEXUSOPS_ADMIN_DISPLAY_NAME`、`NEXUSOPS_ADMIN_PASSWORD`，运行以下一次性初始化命令，再从 shell 环境移除这些变量：
+
+```sh
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml run --rm --no-deps -e NEXUSOPS_ADMIN_USER -e NEXUSOPS_ADMIN_DISPLAY_NAME -e NEXUSOPS_ADMIN_PASSWORD --entrypoint /usr/local/bin/nexusops-init-admin server
+```
+
+不要将初始密码写入 Compose 文件或命令参数；容器运行时管理员环境仍可被 Docker 管理者读取。已存在管理员时初始化会失败。
+
 ## 开发
 
 开发覆盖文件以 Vite 替换 Nginx，绑定本地 `web/` 并启用文件轮询和热更新；Server 和 PostgreSQL 仍使用容器。两个配置使用相同项目和数据库卷，不应同时作为不同环境运行。
