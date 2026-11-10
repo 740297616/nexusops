@@ -1,9 +1,12 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/740297616/nexusops/server/internal/platform"
@@ -12,7 +15,7 @@ import (
 
 func TestHealthAndNotFound(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := NewRouter("test-version")
+	router := NewRouter("test-version", func(context.Context) error { return nil })
 	tests := []struct {
 		path   string
 		status int
@@ -43,5 +46,35 @@ func TestHealthAndNotFound(t *testing.T) {
 				t.Fatalf("unexpected error response: %+v", body)
 			}
 		})
+	}
+}
+
+func TestHealthAndReadinessWhenDatabaseUnavailable(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := NewRouter("test-version", func(context.Context) error { return errors.New("secret connection detail") })
+	for _, tc := range []struct {
+		path   string
+		code   int
+		status string
+	}{{"/api/v1/health", 200, "ok"}, {"/api/v1/ready", 503, "unavailable"}} {
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, tc.path, nil))
+		var body struct {
+			Data struct {
+				Status   string `json:"status"`
+				Database struct {
+					Status string `json:"status"`
+				} `json:"database"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+			t.Fatal(err)
+		}
+		if w.Code != tc.code || body.Data.Status != tc.status || body.Data.Database.Status != "unavailable" {
+			t.Fatalf("%s: %d %s", tc.path, w.Code, w.Body.String())
+		}
+		if strings.Contains(w.Body.String(), "secret") {
+			t.Fatal("response leaked connection detail")
+		}
 	}
 }

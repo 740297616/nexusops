@@ -4,7 +4,7 @@ NexusOps 是一个自托管基础设施管理平台，计划统一查看和管�
 
 ## 当前状态
 
-Phase 1.1 提供 Web 工程骨架和 Server 健康检查；尚未实现业务功能、数据库或部署配置。请勿将设计文档中的目标视为已实现功能。
+Phase 1.2 提供 Web 工程骨架、Server 健康检查和 PostgreSQL 连接与迁移基础设施；尚未实现业务功能或部署配置。请勿将设计文档中的目标视为已实现功能。
 
 ## 技术方向
 
@@ -26,4 +26,4 @@ Server 负责认证、API、业务逻辑与数据库；Agent 负责主机信息�
 
 ## 开发
 
-分别参见 [Web 开发说明](web/README.md) 和 [Server 开发说明](server/README.md)。本阶段不包含数据库、Agent 通信或 Docker Compose。使用许可尚待项目所有者确定，参见 [LICENSE](LICENSE)。
+分别参见 [Web 开发说明](web/README.md) 和 [Server 开发说明](server/README.md)。本阶段不包含业务表、Agent 通信或 Docker Compose。使用许可尚待项目所有者确定，参见 [LICENSE](LICENSE)。
