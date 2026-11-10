@@ -1,0 +1,10 @@
+.env
+.env.*
+.git
+bin
+*.exe
+*.log
+*.pem
+*.key
+*.p12
+secrets

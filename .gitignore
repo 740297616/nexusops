@@ -7,3 +7,6 @@ server/*.exe
 server/.env
 server/.env.*
 !server/.env.example
+deploy/.env
+deploy/.env.*
+!deploy/.env.example
