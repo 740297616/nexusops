@@ -39,6 +39,10 @@ go run ./cmd/server
 
 `GET /api/v1/health` 始终以 HTTP 200 和 `data.status: "ok"` 表示进程存活，同时在 `data.database.status` 返回 `ok` 或 `unavailable`；`GET /api/v1/ready` 在数据库不可用时返回 503。响应不包含数据库连接详情。生产环境应在可信代理处终止 TLS，并保护到 Server 的链路。
 
+## 服务器资产与 Agent
+
+Phase 3.0 增加了服务器资产和独立 Agent 通信。管理员先通过 `POST /api/v1/servers` 创建资产，再调用 `POST /api/v1/servers/{id}/agent/register-token` 获取短期一次性 Token。Agent 以 `Authorization: Agent <credential>` 调用 `/api/v1/agent/heartbeat` 和 `/api/v1/agent/report`；该凭据与用户 Bearer Token 完全分离，服务端只保存 SHA-256 摘要。Token 使用后不可重放，凭据可轮换或撤销。Agent 请求仅支持协议版本 `1`，并限制请求体大小；正式环境必须使用 HTTPS。心跳超时由 `AGENT_HEARTBEAT_TIMEOUT` 控制，注册 Token 有效期由 `AGENT_REGISTRATION_TTL` 控制。服务器禁用后心跳不会恢复其状态。
+
 ## 验证
 
 执行 `go test ./...`、`go vet ./...` 和 `go build ./...`。真实数据库集成测试会修改 Goose 迁移状态，只能在**三个全新、专用、可丢弃**的数据库上运行：通过 `DB_NAME` 指定连接池测试库，以 `NEXUSOPS_AUTH_TEST_DB_NAME`、`NEXUSOPS_RBAC_TEST_DB_NAME` 分别指定认证和 RBAC 测试库，三者不可相同；设置 `NEXUSOPS_DB_INTEGRATION=1` 后执行 `go test -count=1 ./...`。数据库必须尚未应用迁移，测试结束后保留测试数据；再次运行须使用新的隔离数据库。未设置开关时集成测试会明确跳过。

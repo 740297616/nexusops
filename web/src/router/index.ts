@@ -8,6 +8,7 @@ import AuditView from '../views/AuditView.vue'
 import SessionsView from '../views/SessionsView.vue'
 import ConfigView from '../views/ConfigView.vue'
 import PlaceholderView from '../views/PlaceholderView.vue'
+import ServersView from '../views/ServersView.vue'
 export const navigation = [
   { path: '/', name: 'Dashboard', label: '总览', icon: 'Grid' },
   {
@@ -45,7 +46,7 @@ export const navigation = [
     icon: 'Setting',
     permission: 'system:config:read',
   },
-  { path: '/hosts', name: 'Hosts', label: '主机', icon: 'Monitor' },
+  { path: '/hosts', name: 'Hosts', label: '主机', icon: 'Monitor', permission: 'infrastructure:server:read' },
   { path: '/monitoring', name: 'Monitoring', label: '监控', icon: 'DataLine' },
   { path: '/docker', name: 'Docker', label: '容器', icon: 'Box' },
   { path: '/alerts', name: 'Alerts', label: '告警', icon: 'Bell' },
@@ -85,7 +86,12 @@ const router = createRouter({
       component: ConfigView,
       meta: { label: '系统配置', permission: 'system:config:read' },
     },
-    { path: '/hosts', name: 'Hosts', component: PlaceholderView, meta: { label: '主机' } },
+    {
+      path: '/hosts',
+      name: 'Hosts',
+      component: ServersView,
+      meta: { label: '主机', permission: 'infrastructure:server:read' },
+    },
     {
       path: '/monitoring',
       name: 'Monitoring',

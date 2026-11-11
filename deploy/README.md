@@ -51,3 +51,7 @@ Web 和 Server 连接 `frontend` 网络；PostgreSQL 仅连接 `internal` 的 `d
 示例配置的 `DB_SSLMODE=disable` 只适合受信任的单机开发环境，Docker 内部网络不是数据库 TLS 的替代品。正式部署须配置 PostgreSQL TLS、为 Server 和迁移容器提供可信 CA，并设置 `DB_SSLMODE=verify-full`；证书名称须与 `postgres` 主机名匹配。容器内的数据库帐号在初始化时由官方镜像创建，生产环境应另外规划最小权限、秘密注入、备份和恢复。镜像提供 CA 证书，但此示例不配置数据库服务器证书。外部 HTTPS 由可信反向代理终止，并应保护代理至 Web 的链路。
 
 Server 镜像以非 root 用户运行，健康检查使用 readiness；Web 健康检查只检查静态入口。Nginx 的 `index.html` 不做长期缓存，带哈希的 `/assets/` 长期缓存，API 不缓存；SPA 路由回退到 `index.html`。查看状态和日志可使用 `docker compose ... ps`、`docker compose ... logs -f`。普通关闭使用 `docker compose ... down`。
+
+## Agent 部署
+
+先在 Web 的服务器页面创建资产并生成一次性注册 Token，再在目标 Linux 主机运行 `agent/` 中的二进制。Agent 通过 `NEXUSOPS_SERVER_URL` 主动连接，不需要 Compose 暴露管理端口；首次注册成功后应移除 `NEXUSOPS_AGENT_REGISTRATION_TOKEN`，并将凭据文件限制为 0600。凭据轮换或撤销通过服务器管理 API 完成。当前 Agent 只采集基础静态信息和心跳，不包含 Docker、SSH 或任意命令执行。

@@ -19,6 +19,11 @@ const (
 	PermissionSessionManage    = "system:session:manage"
 	PermissionConfigRead       = "system:config:read"
 	PermissionConfigUpdate     = "system:config:update"
+	PermissionServerRead       = "infrastructure:server:read"
+	PermissionServerCreate     = "infrastructure:server:create"
+	PermissionServerUpdate     = "infrastructure:server:update"
+	PermissionServerDelete     = "infrastructure:server:delete"
+	PermissionServerAgent      = "infrastructure:server:manage-agent"
 )
 
 type Role struct {

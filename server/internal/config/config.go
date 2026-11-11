@@ -25,6 +25,7 @@ type Security struct {
 	TrustedProxyCIDRs                                                  []string
 	RateLimitIPMax, RateLimitAccountMax                                int
 	RateLimitWindow, CleanupInterval, SessionRetention, AuditRetention time.Duration
+	AgentHeartbeatTimeout, AgentRegistrationTTL                       time.Duration
 }
 
 func Load() (Config, error) {
@@ -71,7 +72,9 @@ func Load() (Config, error) {
 	if security.AuditRetention, err = durationEnv("AUTH_AUDIT_RETENTION", "2160h"); err != nil {
 		return Config{}, err
 	}
-	if security.RateLimitIPMax < 1 || security.RateLimitAccountMax < 1 || security.RateLimitWindow <= 0 || security.CleanupInterval <= 0 || security.SessionRetention < 0 || security.AuditRetention < 0 {
+	if security.AgentHeartbeatTimeout, err = durationEnv("AGENT_HEARTBEAT_TIMEOUT", "2m"); err != nil { return Config{}, err }
+	if security.AgentRegistrationTTL, err = durationEnv("AGENT_REGISTRATION_TTL", "15m"); err != nil { return Config{}, err }
+	if security.RateLimitIPMax < 1 || security.RateLimitAccountMax < 1 || security.RateLimitWindow <= 0 || security.CleanupInterval <= 0 || security.SessionRetention < 0 || security.AuditRetention < 0 || security.AgentHeartbeatTimeout <= 0 || security.AgentRegistrationTTL <= 0 {
 		return Config{}, fmt.Errorf("security limits and cleanup durations must be valid")
 	}
 	cfg.Security = security

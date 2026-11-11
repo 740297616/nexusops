@@ -1,7 +1,7 @@
 COMPOSE = docker compose --env-file deploy/.env -f deploy/docker-compose.yml
 DEV_COMPOSE = $(COMPOSE) -f deploy/docker-compose.dev.yml
 
-.PHONY: help dev build up down logs migrate-up migrate-down
+.PHONY: help dev build up down logs migrate-up migrate-down agent-build
 
 help:
 	@echo "dev          Start Compose with Vite hot reload"
@@ -11,6 +11,7 @@ help:
 	@echo "logs         Follow service logs"
 	@echo "migrate-up   Apply database migrations"
 	@echo "migrate-down Roll back the last migration"
+	@echo "agent-build  Build Linux amd64 Agent"
 	@echo "Create deploy/.env from deploy/.env.example first."
 
 dev:
@@ -33,3 +34,6 @@ migrate-up:
 
 migrate-down:
 	$(COMPOSE) run --rm --build migrate down
+
+agent-build:
+	cd agent && GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=0.1.0" -o nexusops-agent ./cmd/agent

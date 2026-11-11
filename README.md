@@ -4,7 +4,7 @@ NexusOps 是一个自托管基础设施管理平台，计划统一查看和管�
 
 ## 当前状态
 
-Phase 2.4 提供 Web 工程骨架、用户认证、RBAC、安全审计、会话管理、系统管理 API、共享登录限流、Server 健康检查、PostgreSQL 和 Docker Compose 配置；尚未实现前端管理页面或主机管理等业务功能。请勿将设计文档中的目标视为已实现功能。
+Phase 3.0 提供用户认证、RBAC、安全审计、会话与系统管理 API、服务器资产管理、一次性 Agent 注册、独立 Agent 凭据、基础主机信息上报和 Web 服务器资产页面。Docker 容器管理、实时指标、告警和远程终端仍未实现。请勿将设计文档中的后续目标视为已实现功能。
 
 ## 技术方向
 
@@ -21,9 +21,9 @@ Server 负责认证、API、业务逻辑与数据库；Agent 负责主机信息�
 - [ARCHITECTURE.md](ARCHITECTURE.md)：组件边界、通信与安全设计
 - [DATABASE.md](DATABASE.md)：数据模型、迁移与保留策略
 - [AGENTS.md](AGENTS.md)：AI 协作与工程规范
-- `web/`、`server/`：前端与 Server 工程；`agent/` 为预留目录
+- `web/`、`server/`、`agent/`：前端、Server 与独立 Go Agent 工程
 - `deploy/`、`docs/`、`scripts/`：部署、补充文档和脚本预留目录
 
 ## 开发
 
-分别参见 [Web 开发说明](web/README.md)、[Server 开发说明](server/README.md) 和 [Compose 操作说明](deploy/README.md)。本阶段不包含 Agent 通信。使用许可尚待项目所有者确定，参见 [LICENSE](LICENSE)。
+分别参见 [Web 开发说明](web/README.md)、[Server 开发说明](server/README.md)、[Agent 说明](agent/README.md) 和 [Compose 操作说明](deploy/README.md)。使用许可尚待项目所有者确定，参见 [LICENSE](LICENSE)。

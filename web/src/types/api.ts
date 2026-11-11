@@ -86,3 +86,26 @@ export interface ConfigItem {
   editable: boolean
   updated_at: string
 }
+export interface ServerAsset {
+  id: string
+  name: string
+  hostname: string
+  description: string
+  os: string
+  os_version: string
+  architecture: string
+  kernel_version: string
+  cpu_model: string
+  cpu_cores: number
+  memory_total: number
+  disk_total: number
+  primary_ip: string
+  agent_version: string
+  agent_status: string
+  last_heartbeat_at?: string | null
+  last_report_at?: string | null
+  status: string
+  created_at: string
+  updated_at: string
+}
+export interface AgentInfo { server_id: string; status: string; issued_at: string; rotated_at?: string | null; revoked_at?: string | null }

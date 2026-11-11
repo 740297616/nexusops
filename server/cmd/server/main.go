@@ -15,6 +15,7 @@ import (
 	"github.com/740297616/nexusops/server/internal/database"
 	"github.com/740297616/nexusops/server/internal/rbac"
 	"github.com/740297616/nexusops/server/internal/system"
+	"github.com/740297616/nexusops/server/internal/serverasset"
 )
 
 func main() {
@@ -43,7 +44,15 @@ func run() error {
 	auth.RegisterRoutes(router, authService, rbacService.Effective)
 	rbac.RegisterRoutes(router, authService, rbacService)
 	system.RegisterRoutes(router, authService, rbacService, system.NewService(system.NewRepository(db.GORM())))
+	assetService := serverasset.NewService(serverasset.NewRepository(db.GORM()))
+	serverasset.RegisterRoutes(router, authService, rbacService, assetService, cfg.Security.AgentRegistrationTTL)
+	serverasset.RegisterAgentRoutes(router, assetService)
 	authService.StartCleanup(context.Background(), cfg.Security.CleanupInterval, cfg.Security.SessionRetention, cfg.Security.AuditRetention)
+	go func() {
+		ticker := time.NewTicker(cfg.Security.AgentHeartbeatTimeout / 2)
+		defer ticker.Stop()
+		for range ticker.C { if err := assetService.MarkOffline(context.Background(), cfg.Security.AgentHeartbeatTimeout); err != nil { log.Printf("agent status update failed: %v", err) } }
+	}()
 	server := &http.Server{
 		Addr:              cfg.Address,
 		Handler:           router,

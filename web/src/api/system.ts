@@ -8,6 +8,8 @@ import type {
   RoleAudit,
   Session,
   User,
+  AgentInfo,
+  ServerAsset,
 } from '../types/api'
 export const listUsers = (params: Record<string, unknown>) =>
   unwrap<Page<User>>(client.get('/users', { params }))
@@ -52,3 +54,13 @@ export const revokeUserSession = (userId: number, sessionId: number) =>
 export const getConfig = () => unwrap<ConfigItem[]>(client.get('/system/config'))
 export const setConfig = (body: Record<string, unknown>) =>
   unwrap<{ status: string }>(client.put('/system/config', body))
+export const listServers = (params: Record<string, unknown>) => unwrap<Page<ServerAsset>>(client.get('/servers', { params }))
+export const getServer = (id: string) => unwrap<ServerAsset>(client.get(`/servers/${id}`))
+export const createServer = (body: Record<string, unknown>) => unwrap<ServerAsset>(client.post('/servers', body))
+export const updateServer = (id: string, body: Record<string, unknown>) => unwrap<{ status: string }>(client.put(`/servers/${id}`, body))
+export const setServerStatus = (id: string, status: string) => unwrap<{ status: string }>(client.patch(`/servers/${id}/status`, { status }))
+export const deleteServer = (id: string) => unwrap<{ status: string }>(client.delete(`/servers/${id}`))
+export const getAgentInfo = (id: string) => unwrap<AgentInfo>(client.get(`/servers/${id}/agent`))
+export const createAgentRegistrationToken = (id: string) => unwrap<{ token: string; expires_at: string }>(client.post(`/servers/${id}/agent/register-token`))
+export const rotateAgentCredential = (id: string) => unwrap<{ credential: string }>(client.post(`/servers/${id}/agent/rotate-token`))
+export const revokeAgentCredential = (id: string) => unwrap<{ status: string }>(client.post(`/servers/${id}/agent/revoke`))

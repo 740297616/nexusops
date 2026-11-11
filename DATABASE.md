@@ -26,6 +26,10 @@
 
 ## 初步领域模型
 
+### Phase 3.0 服务器资产与 Agent 身份
+
+`00006_servers.sql` 创建 `servers`、分组/标签关联表、`agent_registration_tokens` 和 `agent_credentials`。服务器使用随机 UUID 字符串作为稳定标识；`name`、`description` 是管理字段，系统信息和心跳字段由 Agent 上报。注册 Token 与 Agent 凭据只保存 SHA-256 摘要，Token 在事务中锁定并原子消费，凭据可轮换或撤销。Agent 只能通过独立的 `Authorization: Agent` 方案访问心跳和上报接口，不能使用用户 Bearer Token。服务器状态为 `pending`、`online`、`offline` 或 `disabled`，禁用状态不会被 Agent 心跳恢复。迁移回滚会删除服务器、凭据和关联数据，执行前应备份并确认影响。
+
 以下为设计方向，不是已实现的表结构或公共契约。具体字段、约束与索引在实现前通过 Migration 确定。
 
 | 实体 | 职责与关键约束 |
