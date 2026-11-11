@@ -3,13 +3,22 @@ package rbac
 import "time"
 
 const (
-	PermissionUserRead       = "system:user:read"
-	PermissionUserCreate     = "system:user:create"
-	PermissionUserUpdate     = "system:user:update"
-	PermissionUserDelete     = "system:user:delete"
-	PermissionRoleRead       = "system:role:read"
-	PermissionRoleManage     = "system:role:manage"
-	PermissionPermissionRead = "system:permission:read"
+	PermissionUserRead         = "system:user:read"
+	PermissionUserCreate       = "system:user:create"
+	PermissionUserUpdate       = "system:user:update"
+	PermissionUserDelete       = "system:user:delete"
+	PermissionRoleRead         = "system:role:read"
+	PermissionRoleManage       = "system:role:manage"
+	PermissionPermissionRead   = "system:permission:read"
+	PermissionRoleCreate       = "system:role:create"
+	PermissionRoleUpdate       = "system:role:update"
+	PermissionRoleDelete       = "system:role:delete"
+	PermissionPermissionManage = "system:permission:manage"
+	PermissionAuditRead        = "system:audit:read"
+	PermissionSessionRead      = "system:session:read"
+	PermissionSessionManage    = "system:session:manage"
+	PermissionConfigRead       = "system:config:read"
+	PermissionConfigUpdate     = "system:config:update"
 )
 
 type Role struct {
@@ -18,6 +27,7 @@ type Role struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	Status      string    `json:"status"`
+	IsSystem    bool      `json:"is_system"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

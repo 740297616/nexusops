@@ -14,6 +14,7 @@ import (
 	"github.com/740297616/nexusops/server/internal/config"
 	"github.com/740297616/nexusops/server/internal/database"
 	"github.com/740297616/nexusops/server/internal/rbac"
+	"github.com/740297616/nexusops/server/internal/system"
 )
 
 func main() {
@@ -41,6 +42,7 @@ func run() error {
 	rbacService := rbac.NewService(rbac.NewRepository(db.GORM()))
 	auth.RegisterRoutes(router, authService, rbacService.Effective)
 	rbac.RegisterRoutes(router, authService, rbacService)
+	system.RegisterRoutes(router, authService, rbacService, system.NewService(system.NewRepository(db.GORM())))
 	authService.StartCleanup(context.Background(), cfg.Security.CleanupInterval, cfg.Security.SessionRetention, cfg.Security.AuditRetention)
 	server := &http.Server{
 		Addr:              cfg.Address,

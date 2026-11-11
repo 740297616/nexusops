@@ -78,3 +78,13 @@ Access Token 有效期 15 分钟；Refresh Token 随会话在首次登录后最�
 ```go
 group.GET("/example", auth.RequireAuthentication(authService), rbac.RequirePermission(rbacService, rbac.PermissionRoleRead), handler)
 ```
+
+## 系统管理接口
+
+系统管理 API 只使用现有认证和 RBAC Middleware。用户列表 `GET /api/v1/users` 支持 `page`、`page_size`、`q` 和 `status`；用户详情、创建、更新、状态切换和密码重置分别使用 `/users/{id}` 资源。禁用用户或重置密码会撤销其所有 Session。用户接口始终返回脱敏用户视图。
+
+角色接口扩展了角色详情、创建、修改、状态切换、删除和角色权限批量设置。系统内置角色带 `is_system` 标志，不能修改或删除；仍被用户使用的自定义角色不能删除。权限定义仍由数据库维护，批量授权在事务中执行并即时生效。
+
+审计查询包括 `GET /api/v1/audit/auth` 和 `GET /api/v1/audit/roles`，按时间倒序分页；可按事件类型、结果和用户筛选。审计只读，接口不提供删除或修改。跨用户 Session 查询和撤销使用 `/api/v1/admin/sessions` 及 `/api/v1/admin/users/{id}/sessions`，分别需要 `system:session:read` 和 `system:session:manage`，响应不含 Token。系统配置接口 `GET/PUT /api/v1/system/config` 只返回非敏感项，部署级配置仍只能通过环境变量设置。
+
+新增权限包括 `system:role:create/update/delete`、`system:permission:manage`、`system:audit:read`、`system:session:read/manage` 和 `system:config:read/update`。角色、用户、审计、Session 和配置管理操作写入认证审计；所有列表接口限制页大小为 100。当前尚未提供用户删除、审计全文关键词查询、配置项动态注册或资源级权限。

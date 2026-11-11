@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -13,6 +14,9 @@ import (
 var ErrUserNotFound = errors.New("user not found")
 var ErrInvalidRole = errors.New("unknown or disabled role")
 var ErrLastSuperAdmin = errors.New("cannot remove the last active super administrator")
+var ErrSystemRole = errors.New("system role cannot be changed")
+var ErrRoleInUse = errors.New("role is still assigned to users")
+var ErrPermissionUnavailable = errors.New("permission is unavailable")
 
 type Repository struct{ db *gorm.DB }
 
@@ -60,6 +64,100 @@ func (r *Repository) ListRoles(ctx context.Context) ([]Role, error) {
 	roles := []Role{}
 	err := r.db.WithContext(ctx).Order("code").Find(&roles).Error
 	return roles, err
+}
+func (r *Repository) GetRole(ctx context.Context, id int64) (Role, error) {
+	var role Role
+	err := r.db.WithContext(ctx).First(&role, id).Error
+	return role, err
+}
+func (r *Repository) CreateRole(ctx context.Context, role *Role, actorID int64) error {
+	if role.Code == "super_admin" || role.Code == "admin" || role.Code == "operator" {
+		return ErrSystemRole
+	}
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(role).Error; err != nil {
+			return err
+		}
+		return r.auditManagement(tx, actorID, "role_created", role.ID, map[string]any{"code": role.Code})
+	})
+}
+func (r *Repository) UpdateRole(ctx context.Context, roleID int64, name, description string, actorID int64) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var role Role
+		if err := tx.First(&role, roleID).Error; err != nil {
+			return err
+		}
+		if role.IsSystem {
+			return ErrSystemRole
+		}
+		if err := tx.Model(&role).Updates(map[string]any{"name": name, "description": description, "updated_at": time.Now().UTC()}).Error; err != nil {
+			return err
+		}
+		return r.auditManagement(tx, actorID, "role_updated", roleID, map[string]any{"name": name})
+	})
+}
+func (r *Repository) SetRoleStatusManaged(ctx context.Context, roleID int64, status string, actorID int64) error {
+	if err := r.SetRoleStatus(ctx, roleID, status); err != nil {
+		return err
+	}
+	return r.db.WithContext(ctx).Exec("INSERT INTO auth_audit_events (user_id,event_type,outcome,metadata) VALUES (?, ?, ?, ?::jsonb)", actorID, "role_status_changed", "success", fmt.Sprintf(`{"role_id":%d,"status":%q}`, roleID, status)).Error
+}
+func (r *Repository) DeleteRoleManaged(ctx context.Context, roleID, actorID int64) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var role Role
+		if err := tx.First(&role, roleID).Error; err != nil {
+			return err
+		}
+		if role.IsSystem {
+			return ErrSystemRole
+		}
+		var count int64
+		if err := tx.Table("user_roles").Where("role_id = ?", roleID).Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			return ErrRoleInUse
+		}
+		if err := tx.Delete(&role).Error; err != nil {
+			return err
+		}
+		return r.auditManagement(tx, actorID, "role_deleted", roleID, nil)
+	})
+}
+func (r *Repository) RolePermissions(ctx context.Context, roleID int64) ([]Permission, error) {
+	items := []Permission{}
+	err := r.db.WithContext(ctx).Table("permissions").Select("permissions.*").Joins("JOIN role_permissions ON role_permissions.permission_id=permissions.id").Where("role_permissions.role_id=?", roleID).Order("permissions.code").Scan(&items).Error
+	return items, err
+}
+func (r *Repository) SetRolePermissions(ctx context.Context, roleID, actorID int64, permissionIDs []int64) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var role Role
+		if err := tx.First(&role, roleID).Error; err != nil {
+			return err
+		}
+		if len(permissionIDs) > 0 {
+			var count int64
+			if err := tx.Model(&Permission{}).Where("id IN ?", permissionIDs).Count(&count).Error; err != nil {
+				return err
+			}
+			if count != int64(len(permissionIDs)) {
+				return ErrPermissionUnavailable
+			}
+		}
+		if err := tx.Exec("DELETE FROM role_permissions WHERE role_id=?", roleID).Error; err != nil {
+			return err
+		}
+		for _, pid := range permissionIDs {
+			if err := tx.Exec("INSERT INTO role_permissions(role_id,permission_id) VALUES (?,?)", roleID, pid).Error; err != nil {
+				return err
+			}
+		}
+		return r.auditManagement(tx, actorID, "role_permissions_changed", roleID, map[string]any{"permission_ids": permissionIDs})
+	})
+}
+func (r *Repository) auditManagement(tx *gorm.DB, actorID int64, event string, targetID int64, metadata map[string]any) error {
+	body, _ := json.Marshal(map[string]any{"target_id": targetID, "details": metadata})
+	return tx.Exec("INSERT INTO auth_audit_events(user_id,event_type,outcome,metadata) VALUES (?, ?, ?, ?::jsonb)", actorID, event, "success", string(body)).Error
 }
 func (r *Repository) ListPermissions(ctx context.Context) ([]Permission, error) {
 	permissions := []Permission{}
