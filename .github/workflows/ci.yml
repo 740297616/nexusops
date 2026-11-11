@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  server:
+    name: Server checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    services:
+      postgres:
+        image: postgres:16.10-bookworm
+        env:
+          POSTGRES_USER: nexusops
+          POSTGRES_PASSWORD: nexusops_ci_password
+          POSTGRES_DB: nexusops_ci_base
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nexusops -d nexusops_ci_base"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - name: Format check
+        run: test -z "$(gofmt -l cmd internal)"
+      - name: Vet
+        run: go vet ./...
+      - name: Unit and API tests
+        run: go test ./...
+      - name: Create isolated integration databases
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          for db in nexusops_ci_auth nexusops_ci_rbac; do
+            PGPASSWORD=nexusops_ci_password psql -h 127.0.0.1 -U nexusops -d nexusops_ci_base -v ON_ERROR_STOP=1 -c "CREATE DATABASE $db";
+          done
+      - name: PostgreSQL integration tests
+        env:
+          NEXUSOPS_DB_INTEGRATION: "1"
+          NEXUSOPS_AUTH_TEST_DB_NAME: nexusops_ci_auth
+          NEXUSOPS_RBAC_TEST_DB_NAME: nexusops_ci_rbac
+          DB_HOST: 127.0.0.1
+          DB_PORT: "5432"
+          DB_USER: nexusops
+          DB_PASSWORD: nexusops_ci_password
+          DB_NAME: nexusops_ci_base
+          DB_SSLMODE: disable
+        run: go test -count=1 ./...
+      - name: Build
+        run: go build ./...
+
+  agent:
+    name: Agent checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: agent/go.mod
+          cache-dependency-path: agent/go.mod
+      - name: Format check
+        run: test -z "$(gofmt -l .)"
+      - name: Vet and tests
+        run: |
+          go vet ./...
+          go test ./...
+      - name: Linux amd64 build
+        env:
+          GOOS: linux
+          GOARCH: amd64
+        run: go build -o nexusops-agent-linux-amd64 ./cmd/agent
+      - name: Linux arm64 build
+        env:
+          GOOS: linux
+          GOARCH: arm64
+        run: go build -o nexusops-agent-linux-arm64 ./cmd/agent
+
+  web:
+    name: Web checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm build
+
+  docker:
+    name: Docker checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compose config
+        working-directory: deploy
+        env:
+          DB_USER: nexusops_ci
+          DB_NAME: nexusops_ci
+          DB_PASSWORD: nexusops_ci_password
+        run: docker compose -p nexusops-ci config --quiet
+      - name: Build Server image
+        run: docker build -t nexusops-ci-server:ci ./server
+      - name: Build Web image
+        run: docker build -t nexusops-ci-web:ci ./web

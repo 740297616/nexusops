@@ -14,8 +14,8 @@ import (
 	"github.com/740297616/nexusops/server/internal/config"
 	"github.com/740297616/nexusops/server/internal/database"
 	"github.com/740297616/nexusops/server/internal/rbac"
-	"github.com/740297616/nexusops/server/internal/system"
 	"github.com/740297616/nexusops/server/internal/serverasset"
+	"github.com/740297616/nexusops/server/internal/system"
 )
 
 func main() {
@@ -53,7 +53,16 @@ func run() error {
 	go func() {
 		ticker := time.NewTicker(cfg.Security.AgentHeartbeatTimeout / 2)
 		defer ticker.Stop()
-		for { select { case <-ticker.C: if err := assetService.MarkOffline(ctx, cfg.Security.AgentHeartbeatTimeout); err != nil { log.Printf("agent status update failed: %v", err) }; case <-ctx.Done(): return } }
+		for {
+			select {
+			case <-ticker.C:
+				if err := assetService.MarkOffline(ctx, cfg.Security.AgentHeartbeatTimeout); err != nil {
+					log.Printf("agent status update failed: %v", err)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
 	}()
 	server := &http.Server{
 		Addr:              cfg.Address,

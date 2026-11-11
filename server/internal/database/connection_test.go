@@ -92,14 +92,14 @@ func TestPostgresIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	statuses, err := provider.Status(ctx)
-	if err != nil || len(statuses) != 5 || statuses[0].State != goose.StatePending || statuses[1].State != goose.StatePending || statuses[2].State != goose.StatePending || statuses[3].State != goose.StatePending || statuses[4].State != goose.StatePending {
+	if err != nil || len(statuses) != 7 || !allMigrationState(statuses, goose.StatePending) {
 		t.Fatalf("expected a fresh isolated database: %v %v", statuses, err)
 	}
 	results, err := provider.Up(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(results) != 5 {
+	if len(results) != 7 {
 		t.Fatalf("expected fresh isolated database, got %d migrations", len(results))
 	}
 	results, err = provider.Up(ctx)
@@ -107,14 +107,14 @@ func TestPostgresIntegration(t *testing.T) {
 		t.Fatalf("repeated up: %v %v", results, err)
 	}
 	statuses, err = provider.Status(ctx)
-	if err != nil || len(statuses) != 5 || statuses[0].State != goose.StateApplied || statuses[1].State != goose.StateApplied || statuses[2].State != goose.StateApplied || statuses[3].State != goose.StateApplied || statuses[4].State != goose.StateApplied {
+	if err != nil || len(statuses) != 7 || !allMigrationState(statuses, goose.StateApplied) {
 		t.Fatalf("status: %v %v", statuses, err)
 	}
 	if _, err := provider.Down(ctx); err != nil {
 		t.Fatal(err)
 	}
 	statuses, err = provider.Status(ctx)
-	if err != nil || len(statuses) != 5 || statuses[0].State != goose.StateApplied || statuses[1].State != goose.StateApplied || statuses[2].State != goose.StateApplied || statuses[3].State != goose.StateApplied || statuses[4].State != goose.StatePending {
+	if err != nil || len(statuses) != 7 || statuses[6].State != goose.StatePending || !allMigrationState(statuses[:6], goose.StateApplied) {
 		t.Fatalf("down status: %v %v", statuses, err)
 	}
 	if _, err := provider.Up(ctx); err != nil {
@@ -126,4 +126,13 @@ func TestPostgresIntegration(t *testing.T) {
 	if !errors.Is(db.Ping(ctx), ErrUnavailable) {
 		t.Fatal("closed database still responds")
 	}
+}
+
+func allMigrationState(statuses []*goose.MigrationStatus, state goose.State) bool {
+	for _, status := range statuses {
+		if status.State != state {
+			return false
+		}
+	}
+	return true
 }

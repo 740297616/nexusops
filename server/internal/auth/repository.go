@@ -195,7 +195,9 @@ func (r *Repository) Cleanup(ctx context.Context, now time.Time, sessionRetentio
 			break
 		}
 		removed += result.RowsAffected
-		if result.RowsAffected < int64(batch) { break }
+		if result.RowsAffected < int64(batch) {
+			break
+		}
 	}
 	return removed, nil
 }

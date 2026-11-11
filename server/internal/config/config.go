@@ -22,11 +22,11 @@ type Config struct {
 }
 
 type Security struct {
-	TrustedProxyCIDRs                                                  []string
-	RateLimitIPMax, RateLimitAccountMax                                int
-	RateLimitWindow, CleanupInterval, SessionRetention, AuditRetention time.Duration
-	AgentHeartbeatTimeout, AgentRegistrationTTL                       time.Duration
-	AgentRateLimitWindow                                               time.Duration
+	TrustedProxyCIDRs                                                     []string
+	RateLimitIPMax, RateLimitAccountMax                                   int
+	RateLimitWindow, CleanupInterval, SessionRetention, AuditRetention    time.Duration
+	AgentHeartbeatTimeout, AgentRegistrationTTL                           time.Duration
+	AgentRateLimitWindow                                                  time.Duration
 	AgentRegisterRateLimit, AgentHeartbeatRateLimit, AgentReportRateLimit int
 }
 
@@ -74,12 +74,24 @@ func Load() (Config, error) {
 	if security.AuditRetention, err = durationEnv("AUTH_AUDIT_RETENTION", "2160h"); err != nil {
 		return Config{}, err
 	}
-	if security.AgentHeartbeatTimeout, err = durationEnv("AGENT_HEARTBEAT_TIMEOUT", "2m"); err != nil { return Config{}, err }
-	if security.AgentRegistrationTTL, err = durationEnv("AGENT_REGISTRATION_TTL", "15m"); err != nil { return Config{}, err }
-	if security.AgentRateLimitWindow, err = durationEnv("AGENT_RATE_LIMIT_WINDOW", "1m"); err != nil { return Config{}, err }
-	if security.AgentRegisterRateLimit, err = intEnv("AGENT_REGISTER_RATE_LIMIT", "10"); err != nil { return Config{}, err }
-	if security.AgentHeartbeatRateLimit, err = intEnv("AGENT_HEARTBEAT_RATE_LIMIT", "120"); err != nil { return Config{}, err }
-	if security.AgentReportRateLimit, err = intEnv("AGENT_REPORT_RATE_LIMIT", "30"); err != nil { return Config{}, err }
+	if security.AgentHeartbeatTimeout, err = durationEnv("AGENT_HEARTBEAT_TIMEOUT", "2m"); err != nil {
+		return Config{}, err
+	}
+	if security.AgentRegistrationTTL, err = durationEnv("AGENT_REGISTRATION_TTL", "15m"); err != nil {
+		return Config{}, err
+	}
+	if security.AgentRateLimitWindow, err = durationEnv("AGENT_RATE_LIMIT_WINDOW", "1m"); err != nil {
+		return Config{}, err
+	}
+	if security.AgentRegisterRateLimit, err = intEnv("AGENT_REGISTER_RATE_LIMIT", "10"); err != nil {
+		return Config{}, err
+	}
+	if security.AgentHeartbeatRateLimit, err = intEnv("AGENT_HEARTBEAT_RATE_LIMIT", "120"); err != nil {
+		return Config{}, err
+	}
+	if security.AgentReportRateLimit, err = intEnv("AGENT_REPORT_RATE_LIMIT", "30"); err != nil {
+		return Config{}, err
+	}
 	if security.RateLimitIPMax < 1 || security.RateLimitAccountMax < 1 || security.RateLimitWindow <= 0 || security.CleanupInterval <= 0 || security.SessionRetention < 0 || security.AuditRetention < 0 || security.AgentHeartbeatTimeout <= 0 || security.AgentRegistrationTTL <= 0 || security.AgentRateLimitWindow <= 0 || security.AgentRegisterRateLimit < 1 || security.AgentHeartbeatRateLimit < 1 || security.AgentReportRateLimit < 1 {
 		return Config{}, fmt.Errorf("security limits and cleanup durations must be valid")
 	}
