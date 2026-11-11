@@ -70,7 +70,7 @@ func TestAuthenticationPostgres(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	router := api.NewRouter("test", db.Ping)
-	RegisterRoutes(router, service)
+	RegisterRoutes(router, service, func(context.Context, int64) ([]string, []string, error) { return []string{}, []string{}, nil })
 	var logs bytes.Buffer
 	previous := log.Writer()
 	log.SetOutput(&logs)

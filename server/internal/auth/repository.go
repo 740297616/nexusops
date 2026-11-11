@@ -34,7 +34,18 @@ func (r *Repository) InitializeAdmin(ctx context.Context, username, display, has
 		if count > 0 {
 			return ErrAdminExists
 		}
-		return tx.Create(&User{Username: username, DisplayName: display, PasswordHash: hash, Status: "active", Role: "admin"}).Error
+		user := User{Username: username, DisplayName: display, PasswordHash: hash, Status: "active", Role: "admin"}
+		if err := tx.Create(&user).Error; err != nil {
+			return err
+		}
+		result := tx.Exec("INSERT INTO user_roles (user_id, role_id) SELECT ?, id FROM roles WHERE code = ? AND status = 'active'", user.ID, "super_admin")
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return errors.New("active super_admin role is unavailable; apply migrations")
+		}
+		return nil
 	})
 }
 

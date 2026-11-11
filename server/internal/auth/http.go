@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -36,8 +37,10 @@ type principal struct {
 	sessionID int64
 }
 
-func RegisterRoutes(router *gin.Engine, service *Service) {
-	h := &handler{service: service}
+type AuthorizationLoader func(context.Context, int64) ([]string, []string, error)
+
+func RegisterRoutes(router *gin.Engine, service *Service, load AuthorizationLoader) {
+	h := &handler{service: service, load: load}
 	routes := router.Group("/api/v1/auth")
 	routes.Use(func(c *gin.Context) { c.Header("Cache-Control", "no-store"); c.Header("Pragma", "no-cache"); c.Next() })
 	routes.POST("/login", h.login)
@@ -51,6 +54,7 @@ func RegisterRoutes(router *gin.Engine, service *Service) {
 type handler struct {
 	service *Service
 	limiter loginLimiter
+	load    AuthorizationLoader
 }
 
 func respondError(c *gin.Context, status int, code, message string) {
@@ -144,5 +148,14 @@ func (h *handler) logout(c *gin.Context) {
 }
 func (h *handler) me(c *gin.Context) {
 	identity := c.MustGet("auth.principal").(principal)
-	platform.Respond(c, http.StatusOK, identity.user, nil)
+	roles, permissions, err := h.load(c.Request.Context(), identity.user.ID)
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	platform.Respond(c, http.StatusOK, struct {
+		User
+		Roles       []string `json:"roles"`
+		Permissions []string `json:"permissions"`
+	}{identity.user, roles, permissions}, nil)
 }
