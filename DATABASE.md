@@ -53,3 +53,5 @@
 指标和审计保留期、清理频率及容量预算由部署配置和实际需求确定，清理任务必须可观测。上线前制定 PostgreSQL 备份、加密、恢复演练和迁移前备份方案；备份与日志不得泄露注册 Token 或 Agent 凭证明文。涉及历史数据删除的迁移须明确影响及恢复方案。
 
 `00007_agent_security.sql` 创建 PostgreSQL 共享的 `agent_rate_limits`，并增加服务器分组/标签管理权限。Agent 限流使用原子 UPSERT，在多实例下共享窗口和计数；回滚只删除该版本新增的表和权限。
+
+Phase 3.1 监控指标的逻辑模型、索引、聚合和保留策略见 [docs/architecture/monitoring.md](docs/architecture/monitoring.md)。在 3.1.1 实现前不创建指标 Migration；新的指标表必须通过独立 Goose Migration，并验证批量写入、查询、清理和回滚。

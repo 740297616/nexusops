@@ -11,7 +11,7 @@ permissions:
 jobs:
   server:
     name: Server checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: server
@@ -30,8 +30,8 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
@@ -65,13 +65,13 @@ jobs:
 
   agent:
     name: Agent checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: agent
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: agent/go.mod
           cache-dependency-path: agent/go.mod
@@ -94,17 +94,17 @@ jobs:
 
   web:
     name: Web checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-          run_install: false
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.25.0 --activate
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: pnpm
@@ -116,9 +116,9 @@ jobs:
 
   docker:
     name: Docker checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Compose config
         working-directory: deploy
         env:

@@ -26,3 +26,5 @@ PostgreSQL 保存用户、Agent 身份、注册 Token 摘要、资源快照、�
 ## 威胁与待定事项
 
 需要处理 Token 泄露与重放、凭证撤销、TLS 证书验证、恶意或失陷 Agent、权限提升、日志敏感信息和数据库备份泄露。后续设计需确定用户认证机制、凭证轮换、具体服务管理器、连接协议与版本兼容、限流和部署拓扑；这些尚未实现或定稿。
+
+Phase 3.1 监控架构设计见 [docs/architecture/monitoring.md](docs/architecture/monitoring.md)、[监控 API](docs/architecture/monitoring-api.md) 和 [Agent 采集设计](docs/architecture/monitoring-agent.md)。
