@@ -94,3 +94,7 @@ group.GET("/example", auth.RequireAuthentication(authService), rbac.RequirePermi
 新增权限包括 `system:role:create/update/delete`、`system:permission:manage`、`system:audit:read`、`system:session:read/manage` 和 `system:config:read/update`。角色、用户、审计、Session 和配置管理操作写入认证审计；所有列表接口限制页大小为 100。当前尚未提供用户删除、审计全文关键词查询、配置项动态注册或资源级权限。
 
 Agent 安全配置：`AGENT_HEARTBEAT_TIMEOUT`（默认 2m）、`AGENT_REGISTRATION_TTL`（默认 15m）、`AGENT_RATE_LIMIT_WINDOW`（默认 1m）、`AGENT_REGISTER_RATE_LIMIT`（默认每 IP 10 次）、`AGENT_HEARTBEAT_RATE_LIMIT`（默认每 Agent 120 次）和 `AGENT_REPORT_RATE_LIMIT`（默认每 Agent 30 次）。限流状态存储在 PostgreSQL，所有 Server 实例共享。
+
+指标配置：`AGENT_METRICS_RATE_LIMIT`（默认每 Agent 60 次/窗口）、`METRICS_CLEANUP_INTERVAL`（默认 1h）和 `METRICS_RAW_RETENTION`（默认 168h）。当前实现保存原始指标，5 分钟和 1 小时聚合留待后续阶段。
+
+Phase 3.1.1 提供 Agent 指标上报 `POST /api/v1/agent/metrics`，以及管理员查询 `/api/v1/servers/{id}/metrics/latest` 和 `/metrics/history`。当前历史查询只支持 `step=raw`，原始指标默认保留 7 天；聚合数据和监控 Web 页面留待后续阶段。

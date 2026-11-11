@@ -12,6 +12,7 @@ import (
 
 	"github.com/740297616/nexusops/agent/internal/collector"
 	"github.com/740297616/nexusops/agent/internal/config"
+	"github.com/740297616/nexusops/agent/internal/metrics"
 )
 
 type Client struct {
@@ -101,4 +102,15 @@ func (c *Client) Report(ctx context.Context, i collector.Info) error {
 		"kernel_version": i.KernelVersion, "cpu_model": i.CPUModel, "cpu_cores": i.CPUCores,
 		"memory_total": i.MemoryTotal, "disk_total": i.DiskTotal, "primary_ip": i.PrimaryIP,
 	}, &out, true)
+}
+
+func (c *Client) ReportMetrics(ctx context.Context, batch metrics.Batch) error {
+	if c.credential == "" {
+		return errors.New("missing credential")
+	}
+	if batch.RequestID == "" {
+		batch.RequestID = fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	var out any
+	return c.do(ctx, "/agent/metrics", batch, &out, true)
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/740297616/nexusops/agent/internal/client"
 	"github.com/740297616/nexusops/agent/internal/collector"
 	"github.com/740297616/nexusops/agent/internal/config"
+	"github.com/740297616/nexusops/agent/internal/metrics"
 )
 
 var version = "dev"
@@ -44,7 +45,13 @@ func main() {
 	if err := c.Report(ctx, info); err != nil {
 		log.Printf("initial report failed: %v", err)
 	}
-	ticker := time.NewTicker(cfg.HeartbeatInterval)
+	go runHeartbeat(ctx, c, info, cfg.HeartbeatInterval)
+	go runMetrics(ctx, c, cfg)
+	<-ctx.Done()
+}
+
+func runHeartbeat(ctx context.Context, c *client.Client, info collector.Info, interval time.Duration) {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
 		select {
@@ -54,6 +61,44 @@ func main() {
 			}
 		case <-ctx.Done():
 			return
+		}
+	}
+}
+
+func runMetrics(ctx context.Context, c *client.Client, cfg config.Config) {
+	collector := metrics.NewCollector()
+	queue := make(chan metrics.Batch, cfg.MetricsQueueSize)
+	go func() {
+		ticker := time.NewTicker(cfg.MetricsInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				batch, err := collector.Collect(ctx)
+				if err != nil {
+					log.Printf("metrics collection failed: %v", err)
+				}
+				if len(batch.Samples) == 0 {
+					continue
+				}
+				select {
+				case queue <- batch:
+				default:
+					select {
+					case <-queue:
+					default:
+					}
+					queue <- batch
+				}
+			case <-ctx.Done():
+				close(queue)
+				return
+			}
+		}
+	}()
+	for batch := range queue {
+		if err := c.ReportMetrics(ctx, batch); err != nil {
+			log.Printf("metrics report failed: %v", err)
 		}
 	}
 }

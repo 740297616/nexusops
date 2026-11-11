@@ -10,7 +10,8 @@ import (
 
 type Config struct {
 	ServerURL, RegistrationToken, CredentialPath, Version string
-	HeartbeatInterval                                     time.Duration
+	HeartbeatInterval, MetricsInterval                    time.Duration
+	MetricsQueueSize                                      int
 }
 
 func Load(version string) (Config, error) {
@@ -21,6 +22,18 @@ func Load(version string) (Config, error) {
 		return c, errors.New("NEXUSOPS_AGENT_HEARTBEAT_INTERVAL must be positive duration")
 	}
 	c.HeartbeatInterval = d
+	metricsInterval, err := time.ParseDuration(env("NEXUSOPS_AGENT_METRICS_INTERVAL", "30s"))
+	if err != nil || metricsInterval < 10*time.Second || metricsInterval > 5*time.Minute {
+		return c, errors.New("NEXUSOPS_AGENT_METRICS_INTERVAL must be between 10s and 5m")
+	}
+	c.MetricsInterval = metricsInterval
+	queueSize := 4
+	if raw := os.Getenv("NEXUSOPS_AGENT_METRICS_QUEUE_SIZE"); raw != "" {
+		if _, err := fmt.Sscanf(raw, "%d", &queueSize); err != nil || queueSize < 1 || queueSize > 32 {
+			return c, errors.New("NEXUSOPS_AGENT_METRICS_QUEUE_SIZE must be between 1 and 32")
+		}
+	}
+	c.MetricsQueueSize = queueSize
 	if c.ServerURL == "" {
 		return c, errors.New("NEXUSOPS_SERVER_URL is required")
 	}

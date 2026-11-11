@@ -13,6 +13,7 @@ import (
 	"github.com/740297616/nexusops/server/internal/auth"
 	"github.com/740297616/nexusops/server/internal/config"
 	"github.com/740297616/nexusops/server/internal/database"
+	"github.com/740297616/nexusops/server/internal/monitoring"
 	"github.com/740297616/nexusops/server/internal/rbac"
 	"github.com/740297616/nexusops/server/internal/serverasset"
 	"github.com/740297616/nexusops/server/internal/system"
@@ -49,7 +50,10 @@ func run() error {
 	assetService := serverasset.NewService(serverasset.NewRepository(db.GORM()))
 	serverasset.RegisterRoutes(router, authService, rbacService, assetService, cfg.Security.AgentRegistrationTTL)
 	serverasset.RegisterAgentRoutes(router, assetService, serverasset.AgentOptions{Audit: authService, RateLimitWindow: cfg.Security.AgentRateLimitWindow, RegisterRateLimit: cfg.Security.AgentRegisterRateLimit, HeartbeatRateLimit: cfg.Security.AgentHeartbeatRateLimit, ReportRateLimit: cfg.Security.AgentReportRateLimit})
+	monitoringService := monitoring.NewService(monitoring.NewRepository(db.GORM()), cfg.Security.AgentHeartbeatTimeout, cfg.Security.MetricsRawRetention)
+	monitoring.RegisterRoutes(router, authService, rbacService, assetService, monitoringService, monitoring.Options{Audit: authService, RateLimitWindow: cfg.Security.AgentRateLimitWindow, RateLimit: cfg.Security.AgentMetricsRateLimit})
 	authService.StartCleanup(ctx, cfg.Security.CleanupInterval, cfg.Security.SessionRetention, cfg.Security.AuditRetention)
+	monitoringService.StartCleanup(ctx, cfg.Security.MetricsCleanupInterval)
 	go func() {
 		ticker := time.NewTicker(cfg.Security.AgentHeartbeatTimeout / 2)
 		defer ticker.Stop()

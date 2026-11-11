@@ -337,6 +337,11 @@ func agentPrincipal(c *gin.Context) (AgentPrincipal, bool) {
 	p, good := v.(AgentPrincipal)
 	return p, ok && good
 }
+
+func RequireAgentAuthentication(service *Service, audit *auth.Service) gin.HandlerFunc {
+	return agentAuth(service, audit)
+}
+func CurrentAgent(c *gin.Context) (AgentPrincipal, bool) { return agentPrincipal(c) }
 func (h *agentHandler) register(c *gin.Context) {
 	source := "unknown"
 	if h.audit != nil {

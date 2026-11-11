@@ -47,6 +47,9 @@ func (s *Service) RevokeCredential(ctx context.Context, id string) error {
 func (s *Service) MarkOffline(ctx context.Context, timeout time.Duration) error {
 	return s.repo.MarkOffline(ctx, time.Now().UTC().Add(-timeout))
 }
+func (s *Service) AllowAgentRequest(ctx context.Context, key string, now time.Time, window time.Duration, max int) (bool, error) {
+	return s.repo.AllowAgentRequest(ctx, key, now, window, max)
+}
 
 func (s *Service) ListGroups(ctx context.Context, page, size int) ([]Group, int64, error) {
 	return s.repo.ListGroups(ctx, page, size)
