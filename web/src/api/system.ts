@@ -47,6 +47,8 @@ export const listUserSessions = (id: number, params: Record<string, unknown>) =>
   unwrap<Page<Session>>(client.get(`/admin/users/${id}/sessions`, { params }))
 export const revokeUserSessions = (id: number) =>
   unwrap<{ status: string }>(client.delete(`/admin/users/${id}/sessions`))
+export const revokeUserSession = (userId: number, sessionId: number) =>
+  unwrap<{ status: string }>(client.delete(`/admin/users/${userId}/sessions/${sessionId}`))
 export const getConfig = () => unwrap<ConfigItem[]>(client.get('/system/config'))
 export const setConfig = (body: Record<string, unknown>) =>
   unwrap<{ status: string }>(client.put('/system/config', body))

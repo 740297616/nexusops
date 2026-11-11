@@ -26,6 +26,7 @@ func RegisterRoutes(r *gin.Engine, a *auth.Service, x *rbac.Service, s *Service)
 	g.GET("/admin/sessions", rbac.RequirePermission(x, rbac.PermissionSessionRead), h.sessions)
 	g.GET("/admin/users/:id/sessions", rbac.RequirePermission(x, rbac.PermissionSessionRead), h.userSessions)
 	g.DELETE("/admin/users/:id/sessions", rbac.RequirePermission(x, rbac.PermissionSessionManage), h.revokeUserSessions)
+	g.DELETE("/admin/users/:id/sessions/:session_id", rbac.RequirePermission(x, rbac.PermissionSessionManage), h.revokeUserSession)
 	g.GET("/system/config", rbac.RequirePermission(x, rbac.PermissionConfigRead), h.config)
 	g.PUT("/system/config", rbac.RequirePermission(x, rbac.PermissionConfigUpdate), h.setConfig)
 }
@@ -148,7 +149,16 @@ func (h *handler) password(c *gin.Context) {
 }
 func (h *handler) authAudit(c *gin.Context) {
 	p, z := page(c)
-	v, t, e := h.s.AuthAudit(c, p, z, nil, c.Query("event_type"), c.Query("outcome"))
+	var uid *int64
+	if raw := c.Query("user_id"); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || parsed < 1 {
+			bad(c, ErrInvalid)
+			return
+		}
+		uid = &parsed
+	}
+	v, t, e := h.s.AuthAudit(c, p, z, uid, c.Query("event_type"), c.Query("outcome"), c.Query("from"), c.Query("to"))
 	if e != nil {
 		bad(c, e)
 		return
@@ -194,6 +204,23 @@ func (h *handler) revokeUserSessions(c *gin.Context) {
 	a, _ := auth.CurrentUser(c)
 	if e := h.s.RevokeSessions(c, i, nil, a.ID); e != nil {
 		bad(c, e)
+		return
+	}
+	out(c, gin.H{"status": "revoked"})
+}
+func (h *handler) revokeUserSession(c *gin.Context) {
+	userID, ok := id(c)
+	if !ok {
+		return
+	}
+	sessionID, err := strconv.ParseInt(c.Param("session_id"), 10, 64)
+	if err != nil || sessionID < 1 {
+		bad(c, ErrInvalid)
+		return
+	}
+	actor, _ := auth.CurrentUser(c)
+	if err := h.s.RevokeSessions(c, userID, &sessionID, actor.ID); err != nil {
+		bad(c, err)
 		return
 	}
 	out(c, gin.H{"status": "revoked"})

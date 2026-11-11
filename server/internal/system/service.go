@@ -34,8 +34,8 @@ func (s *Service) Sessions(c context.Context, p, sz int, u *int64) ([]auth.Sessi
 func (s *Service) RevokeSessions(c context.Context, u int64, sid *int64, a int64) error {
 	return s.repo.RevokeUserSessions(c, u, sid, a)
 }
-func (s *Service) AuthAudit(c context.Context, p, sz int, u *int64, e, o string) ([]AuditView, int64, error) {
-	return s.repo.ListAuthAudit(c, p, sz, u, e, o)
+func (s *Service) AuthAudit(c context.Context, p, sz int, u *int64, e, o, from, to string) ([]AuditView, int64, error) {
+	return s.repo.ListAuthAudit(c, p, sz, u, e, o, from, to)
 }
 func (s *Service) RoleAudit(c context.Context, p, sz int) ([]RoleAuditView, int64, error) {
 	return s.repo.ListRoleAudit(c, p, sz)

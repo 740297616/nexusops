@@ -166,7 +166,7 @@ func (r *Repository) RevokeUserSessions(ctx context.Context, userID int64, sessi
 	}
 	return r.db.WithContext(ctx).Exec("INSERT INTO auth_audit_events(user_id,event_type,outcome,metadata) VALUES (?, ?, ?, ?::jsonb)", actorID, "admin_sessions_revoked", "success", fmt.Sprintf(`{"target_user_id":%d}`, userID)).Error
 }
-func (r *Repository) ListAuthAudit(ctx context.Context, page, size int, userID *int64, event, outcome string) ([]AuditView, int64, error) {
+func (r *Repository) ListAuthAudit(ctx context.Context, page, size int, userID *int64, event, outcome, from, to string) ([]AuditView, int64, error) {
 	q := r.db.WithContext(ctx).Table("auth_audit_events")
 	if userID != nil {
 		q = q.Where("user_id=?", *userID)
@@ -176,6 +176,12 @@ func (r *Repository) ListAuthAudit(ctx context.Context, page, size int, userID *
 	}
 	if outcome != "" {
 		q = q.Where("outcome=?", outcome)
+	}
+	if from != "" {
+		q = q.Where("created_at >= ?", from)
+	}
+	if to != "" {
+		q = q.Where("created_at <= ?", to)
 	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {

@@ -1,9 +1,19 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { listUsers, setUserStatus, resetPassword } from '../api/system'
-import type { User, Page } from '../types/api'
+import {
+  listUsers,
+  createUser,
+  updateUser,
+  setUserStatus,
+  resetPassword,
+  userRoles,
+  setUserRoles,
+  listRoles,
+} from '../api/system'
+import type { User, Page, Role } from '../types/api'
 const data = ref<Page<User>>({ items: [], total: 0, page: 1, page_size: 20 })
+const roles = ref<Role[]>([])
 const loading = ref(false)
 const q = ref('')
 const status = ref('')
@@ -22,33 +32,82 @@ async function load() {
     loading.value = false
   }
 }
-async function toggle(u: User) {
-  const next = u.status === 'active' ? 'disabled' : 'active'
+async function create() {
   try {
+    const form = await ElMessageBox.prompt('请输入初始密码（至少 12 位）', '创建用户', {
+      inputType: 'password',
+      inputPattern: /^.{12,}$/,
+      inputErrorMessage: '密码至少 12 位',
+    })
+    const username = await ElMessageBox.prompt('请输入用户名', '创建用户')
+    const display = await ElMessageBox.prompt('请输入显示名称', '创建用户')
+    await createUser({
+      username: username.value,
+      display_name: display.value,
+      password: form.value,
+    })
+    ElMessage.success('用户已创建')
+    load()
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error(e instanceof Error ? e.message : '创建失败')
+  }
+}
+async function toggle(u: User) {
+  try {
+    const next = u.status === 'active' ? 'disabled' : 'active'
     await ElMessageBox.confirm(
-      `确认${next === 'disabled' ? '禁用' : '启用'}用户 ${u.username}？禁用会撤销其所有会话。`,
+      `确认${next === 'disabled' ? '禁用' : '启用'} ${u.username}？禁用会撤销全部会话。`,
       '确认操作',
     )
     await setUserStatus(u.id, next)
     ElMessage.success('操作成功')
     load()
-  } catch (error) {
-    if (error !== 'cancel') ElMessage.error(error instanceof Error ? error.message : '操作失败')
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error(e instanceof Error ? e.message : '操作失败')
+  }
+}
+async function edit(u: User) {
+  try {
+    const display = await ElMessageBox.prompt('修改显示名称', '编辑用户', {
+      inputValue: u.display_name,
+    })
+    await updateUser(u.id, { display_name: display.value })
+    ElMessage.success('已更新')
+    load()
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error(e instanceof Error ? e.message : '更新失败')
   }
 }
 async function password(u: User) {
   try {
-    const { value } = await ElMessageBox.prompt(
-      `为 ${u.username} 设置新密码（至少 12 位）`,
-      '重置密码',
-      { inputType: 'password', inputPattern: /^.{12,}$/, inputErrorMessage: '密码至少 12 位' },
-    )
-    if (value) {
-      await resetPassword(u.id, value)
-      ElMessage.success('密码已重置')
-    }
+    const result = await ElMessageBox.prompt(`为 ${u.username} 设置新密码`, '重置密码', {
+      inputType: 'password',
+      inputPattern: /^.{12,}$/,
+      inputErrorMessage: '密码至少 12 位',
+    })
+    await resetPassword(u.id, result.value)
+    ElMessage.success('密码已重置，原会话已撤销')
   } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : '操作失败')
+    if (e !== 'cancel') ElMessage.error(e instanceof Error ? e.message : '操作失败')
+  }
+}
+async function assignRoles(u: User) {
+  try {
+    if (!roles.value.length) roles.value = await listRoles()
+    const current = await userRoles(u.id)
+    const selected = await ElMessageBox.prompt(
+      `当前角色：${current.map((r) => r.code).join(', ') || '无'}。请输入角色 ID，以逗号分隔`,
+      '分配角色',
+      { inputValue: current.map((r) => r.id).join(',') },
+    )
+    const ids = selected.value
+      .split(',')
+      .map((v) => Number(v.trim()))
+      .filter(Boolean)
+    await setUserRoles(u.id, ids)
+    ElMessage.success('角色已更新')
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error(e instanceof Error ? e.message : '角色更新失败')
   }
 }
 onMounted(load)
@@ -58,9 +117,9 @@ onMounted(load)
     <div>
       <div class="eyebrow">SYSTEM / USERS</div>
       <h1>用户管理</h1>
-      <p>管理用户状态、密码与访问权限</p>
+      <p>用户状态、密码与角色</p>
     </div>
-    <span class="page-tag">{{ data.total }} 个用户</span>
+    <el-button type="primary" @click="create">创建用户</el-button>
   </div>
   <section class="section-block">
     <div class="toolbar">
@@ -85,20 +144,21 @@ onMounted(load)
             row.status === 'active' ? '启用' : '禁用'
           }}</el-tag></template
         ></el-table-column
-      ><el-table-column prop="role" label="兼容角色" /><el-table-column
-        prop="last_login_at"
-        label="最近登录"
-      /><el-table-column label="操作" width="180"
+      ><el-table-column prop="last_login_at" label="最近登录" /><el-table-column
+        label="操作"
+        width="310"
         ><template #default="{ row }"
+          ><el-button link @click="edit(row)">编辑</el-button
+          ><el-button link @click="assignRoles(row)">角色</el-button
+          ><el-button link @click="password(row)">重置密码</el-button
           ><el-button link @click="toggle(row)">{{
             row.status === 'active' ? '禁用' : '启用'
-          }}</el-button
-          ><el-button link @click="password(row)">重置密码</el-button></template
+          }}</el-button></template
         ></el-table-column
       ></el-table
     ><el-pagination
       v-model:current-page="data.page"
-      v-model:page-size="data.page_size"
+      :page-size="data.page_size"
       :total="data.total"
       layout="total, prev, pager, next"
       @current-change="load"
