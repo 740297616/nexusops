@@ -35,6 +35,7 @@ type Server struct {
 func (Server) TableName() string { return "servers" }
 
 type AgentCredentialInfo struct {
+	ID        int64      `json:"id"`
 	ServerID  string     `json:"server_id"`
 	Status    string     `json:"status"`
 	IssuedAt  time.Time  `json:"issued_at"`
@@ -52,5 +53,21 @@ type Page struct {
 	Total    int64    `json:"total"`
 	Page     int      `json:"page"`
 	PageSize int      `json:"page_size"`
+}
+
+type Group struct {
+	ID          int64     `json:"id"`
+	Code        string    `json:"code"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type Tag struct {
+	ID        int64     `json:"id"`
+	Code      string    `json:"code"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
 }
 

@@ -24,6 +24,8 @@ const (
 	PermissionServerUpdate     = "infrastructure:server:update"
 	PermissionServerDelete     = "infrastructure:server:delete"
 	PermissionServerAgent      = "infrastructure:server:manage-agent"
+	PermissionServerGroup      = "infrastructure:server:group-manage"
+	PermissionServerTag        = "infrastructure:server:tag-manage"
 )
 
 type Role struct {

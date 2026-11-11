@@ -109,3 +109,5 @@ export interface ServerAsset {
   updated_at: string
 }
 export interface AgentInfo { server_id: string; status: string; issued_at: string; rotated_at?: string | null; revoked_at?: string | null }
+export interface ServerGroup { id: number; code: string; name: string; description: string; created_at: string; updated_at: string }
+export interface ServerTag { id: number; code: string; name: string; created_at: string }

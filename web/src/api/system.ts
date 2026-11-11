@@ -10,6 +10,8 @@ import type {
   User,
   AgentInfo,
   ServerAsset,
+  ServerGroup,
+  ServerTag,
 } from '../types/api'
 export const listUsers = (params: Record<string, unknown>) =>
   unwrap<Page<User>>(client.get('/users', { params }))
@@ -55,6 +57,18 @@ export const getConfig = () => unwrap<ConfigItem[]>(client.get('/system/config')
 export const setConfig = (body: Record<string, unknown>) =>
   unwrap<{ status: string }>(client.put('/system/config', body))
 export const listServers = (params: Record<string, unknown>) => unwrap<Page<ServerAsset>>(client.get('/servers', { params }))
+export const listServerGroups = (params: Record<string, unknown> = {}) => unwrap<{ items: ServerGroup[]; total: number; page: number; page_size: number }>(client.get('/groups', { params }))
+export const createServerGroup = (body: Record<string, unknown>) => unwrap<ServerGroup>(client.post('/groups', body))
+export const updateServerGroup = (id: number, body: Record<string, unknown>) => unwrap<{ status: string }>(client.put(`/groups/${id}`, body))
+export const deleteServerGroup = (id: number) => unwrap<{ status: string }>(client.delete(`/groups/${id}`))
+export const listServerTags = () => unwrap<ServerTag[]>(client.get('/tags'))
+export const createServerTag = (body: Record<string, unknown>) => unwrap<ServerTag>(client.post('/tags', body))
+export const updateServerTag = (id: number, body: Record<string, unknown>) => unwrap<{ status: string }>(client.put(`/tags/${id}`, body))
+export const deleteServerTag = (id: number) => unwrap<{ status: string }>(client.delete(`/tags/${id}`))
+export const setServerGroups = (id: string, group_ids: number[]) => unwrap<{ status: string }>(client.put(`/servers/${id}/groups`, { group_ids }))
+export const setServerTags = (id: string, tag_ids: number[]) => unwrap<{ status: string }>(client.put(`/servers/${id}/tags`, { tag_ids }))
+export const serverGroups = (id: string) => unwrap<ServerGroup[]>(client.get(`/servers/${id}/groups`))
+export const serverTags = (id: string) => unwrap<ServerTag[]>(client.get(`/servers/${id}/tags`))
 export const getServer = (id: string) => unwrap<ServerAsset>(client.get(`/servers/${id}`))
 export const createServer = (body: Record<string, unknown>) => unwrap<ServerAsset>(client.post('/servers', body))
 export const updateServer = (id: string, body: Record<string, unknown>) => unwrap<{ status: string }>(client.put(`/servers/${id}`, body))

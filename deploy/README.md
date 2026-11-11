@@ -55,3 +55,5 @@ Server 镜像以非 root 用户运行，健康检查使用 readiness；Web 健�
 ## Agent 部署
 
 先在 Web 的服务器页面创建资产并生成一次性注册 Token，再在目标 Linux 主机运行 `agent/` 中的二进制。Agent 通过 `NEXUSOPS_SERVER_URL` 主动连接，不需要 Compose 暴露管理端口；首次注册成功后应移除 `NEXUSOPS_AGENT_REGISTRATION_TOKEN`，并将凭据文件限制为 0600。凭据轮换或撤销通过服务器管理 API 完成。当前 Agent 只采集基础静态信息和心跳，不包含 Docker、SSH 或任意命令执行。
+
+Agent 接口使用 `AGENT_RATE_LIMIT_WINDOW`、`AGENT_REGISTER_RATE_LIMIT`、`AGENT_HEARTBEAT_RATE_LIMIT` 和 `AGENT_REPORT_RATE_LIMIT` 控制 PostgreSQL 共享限流，超限返回 429，限流存储不可用时返回 503。

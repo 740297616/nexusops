@@ -92,3 +92,5 @@ group.GET("/example", auth.RequireAuthentication(authService), rbac.RequirePermi
 审计查询包括 `GET /api/v1/audit/auth` 和 `GET /api/v1/audit/roles`，按时间倒序分页；可按事件类型、结果和用户筛选。审计只读，接口不提供删除或修改。跨用户 Session 查询和撤销使用 `/api/v1/admin/sessions` 及 `/api/v1/admin/users/{id}/sessions`，分别需要 `system:session:read` 和 `system:session:manage`，响应不含 Token。系统配置接口 `GET/PUT /api/v1/system/config` 只返回非敏感项，部署级配置仍只能通过环境变量设置。
 
 新增权限包括 `system:role:create/update/delete`、`system:permission:manage`、`system:audit:read`、`system:session:read/manage` 和 `system:config:read/update`。角色、用户、审计、Session 和配置管理操作写入认证审计；所有列表接口限制页大小为 100。当前尚未提供用户删除、审计全文关键词查询、配置项动态注册或资源级权限。
+
+Agent 安全配置：`AGENT_HEARTBEAT_TIMEOUT`（默认 2m）、`AGENT_REGISTRATION_TTL`（默认 15m）、`AGENT_RATE_LIMIT_WINDOW`（默认 1m）、`AGENT_REGISTER_RATE_LIMIT`（默认每 IP 10 次）、`AGENT_HEARTBEAT_RATE_LIMIT`（默认每 Agent 120 次）和 `AGENT_REPORT_RATE_LIMIT`（默认每 Agent 30 次）。限流状态存储在 PostgreSQL，所有 Server 实例共享。

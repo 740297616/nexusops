@@ -40,18 +40,20 @@ func run() error {
 		return err
 	}
 	router := api.NewRouter(cfg.Version, db.Ping)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	rbacService := rbac.NewService(rbac.NewRepository(db.GORM()))
 	auth.RegisterRoutes(router, authService, rbacService.Effective)
 	rbac.RegisterRoutes(router, authService, rbacService)
 	system.RegisterRoutes(router, authService, rbacService, system.NewService(system.NewRepository(db.GORM())))
 	assetService := serverasset.NewService(serverasset.NewRepository(db.GORM()))
 	serverasset.RegisterRoutes(router, authService, rbacService, assetService, cfg.Security.AgentRegistrationTTL)
-	serverasset.RegisterAgentRoutes(router, assetService)
-	authService.StartCleanup(context.Background(), cfg.Security.CleanupInterval, cfg.Security.SessionRetention, cfg.Security.AuditRetention)
+	serverasset.RegisterAgentRoutes(router, assetService, serverasset.AgentOptions{Audit: authService, RateLimitWindow: cfg.Security.AgentRateLimitWindow, RegisterRateLimit: cfg.Security.AgentRegisterRateLimit, HeartbeatRateLimit: cfg.Security.AgentHeartbeatRateLimit, ReportRateLimit: cfg.Security.AgentReportRateLimit})
+	authService.StartCleanup(ctx, cfg.Security.CleanupInterval, cfg.Security.SessionRetention, cfg.Security.AuditRetention)
 	go func() {
 		ticker := time.NewTicker(cfg.Security.AgentHeartbeatTimeout / 2)
 		defer ticker.Stop()
-		for range ticker.C { if err := assetService.MarkOffline(context.Background(), cfg.Security.AgentHeartbeatTimeout); err != nil { log.Printf("agent status update failed: %v", err) } }
+		for { select { case <-ticker.C: if err := assetService.MarkOffline(ctx, cfg.Security.AgentHeartbeatTimeout); err != nil { log.Printf("agent status update failed: %v", err) }; case <-ctx.Done(): return } }
 	}()
 	server := &http.Server{
 		Addr:              cfg.Address,
@@ -59,8 +61,6 @@ func run() error {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	log.Printf("starting server on %s", cfg.Address)
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- server.ListenAndServe() }()
 	select {

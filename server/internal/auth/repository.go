@@ -187,6 +187,16 @@ func (r *Repository) Cleanup(ctx context.Context, now time.Time, sessionRetentio
 			}
 		}
 	}
+	// Agent rate-limit windows are ephemeral; prune old keys in bounded batches.
+	for {
+		result := r.db.WithContext(ctx).Exec(`DELETE FROM agent_rate_limits WHERE rate_key IN (SELECT rate_key FROM agent_rate_limits WHERE updated_at < ? ORDER BY updated_at LIMIT ?)`, now.Add(-24*time.Hour), batch)
+		if result.Error != nil {
+			// Older databases may not have the Phase 3.0.5 table yet.
+			break
+		}
+		removed += result.RowsAffected
+		if result.RowsAffected < int64(batch) { break }
+	}
 	return removed, nil
 }
 
