@@ -111,6 +111,22 @@ func TestAuthenticationPostgres(t *testing.T) {
 		t.Fatalf("missing token: %d", w.Code)
 	}
 	tokens := login("ADMIN", password)
+	firstSessions := call("GET", "/api/v1/auth/sessions", "", tokens.AccessToken)
+	if firstSessions.Code != 200 || !strings.Contains(firstSessions.Body.String(), `"current":true`) || strings.Contains(firstSessions.Body.String(), "access_hash") {
+		t.Fatalf("sessions: %d %s", firstSessions.Code, firstSessions.Body.String())
+	}
+	second := login("admin", password)
+	otherSessions := call("DELETE", "/api/v1/auth/sessions", "", second.AccessToken)
+	if otherSessions.Code != 200 {
+		t.Fatalf("revoke other sessions: %d", otherSessions.Code)
+	}
+	if w := call("GET", "/api/v1/auth/me", "", tokens.AccessToken); w.Code != 401 {
+		t.Fatal("revoked other session remains active")
+	}
+	if w := call("GET", "/api/v1/auth/me", "", second.AccessToken); w.Code != 200 {
+		t.Fatal("current session revoked unexpectedly")
+	}
+	tokens = second
 	if w := call("GET", "/api/v1/auth/me", "", tokens.AccessToken); w.Code != 200 || strings.Contains(w.Body.String(), "password_hash") || strings.Contains(w.Body.String(), password) {
 		t.Fatalf("me: %d %s", w.Code, w.Body.String())
 	}
@@ -209,6 +225,23 @@ func TestAuthenticationPostgres(t *testing.T) {
 	}
 	if strings.Contains(logs.String(), password) || strings.Contains(logs.String(), tokens.AccessToken) || strings.Contains(logs.String(), tokens.RefreshToken) {
 		t.Fatal("credentials leaked to request logs")
+	}
+	limited, err := NewServiceWithOptions(NewRepository(db.GORM()), Options{RateLimitIPMax: 2, RateLimitAccountMax: 100, RateLimitWindow: time.Hour})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if allowed, err := limited.AllowLogin(ctx, "203.0.113.77", "admin"); err != nil || !allowed {
+		t.Fatalf("first shared limit: %v %v", allowed, err)
+	}
+	if allowed, err := limited.AllowLogin(ctx, "203.0.113.77", "admin"); err != nil || !allowed {
+		t.Fatalf("second shared limit: %v %v", allowed, err)
+	}
+	if allowed, err := limited.AllowLogin(ctx, "203.0.113.77", "admin"); err != nil || allowed {
+		t.Fatalf("shared limit was not enforced: %v %v", allowed, err)
+	}
+	var auditCount int64
+	if err := db.GORM().Raw("SELECT count(*) FROM auth_audit_events WHERE event_type IN ('login_succeeded','login_failed','refresh_succeeded','refresh_replay','logout','other_sessions_revoked')").Scan(&auditCount).Error; err != nil || auditCount < 6 {
+		t.Fatalf("audit events: %d %v", auditCount, err)
 	}
 	for _, path := range []string{"/api/v1/health", "/api/v1/ready"} {
 		if w := call("GET", path, "", ""); w.Code != 200 {

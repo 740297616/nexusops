@@ -1,9 +1,6 @@
 package auth
 
-import (
-	"testing"
-	"time"
-)
+import "testing"
 
 func TestPasswordHash(t *testing.T) {
 	password := "correct test phrase"
@@ -20,18 +17,5 @@ func TestPasswordHash(t *testing.T) {
 	}
 	if _, err := HashPassword("short"); err == nil {
 		t.Fatal("short password accepted")
-	}
-}
-
-func TestLoginLimiter(t *testing.T) {
-	limiter := loginLimiter{}
-	now := time.Now()
-	for i := 0; i < 20; i++ {
-		if !limiter.allow(now) {
-			t.Fatal("limited too early")
-		}
-	}
-	if limiter.allow(now) || !limiter.allow(now.Add(time.Minute)) {
-		t.Fatal("rate limit did not reset")
 	}
 }

@@ -33,7 +33,7 @@ func run() error {
 		return err
 	}
 	defer db.Close()
-	authService, err := auth.NewService(auth.NewRepository(db.GORM()))
+	authService, err := auth.NewServiceWithOptions(auth.NewRepository(db.GORM()), auth.Options{TrustedProxyCIDRs: cfg.Security.TrustedProxyCIDRs, RateLimitIPMax: cfg.Security.RateLimitIPMax, RateLimitAccountMax: cfg.Security.RateLimitAccountMax, RateLimitWindow: cfg.Security.RateLimitWindow})
 	if err != nil {
 		return err
 	}
@@ -41,6 +41,7 @@ func run() error {
 	rbacService := rbac.NewService(rbac.NewRepository(db.GORM()))
 	auth.RegisterRoutes(router, authService, rbacService.Effective)
 	rbac.RegisterRoutes(router, authService, rbacService)
+	authService.StartCleanup(context.Background(), cfg.Security.CleanupInterval, cfg.Security.SessionRetention, cfg.Security.AuditRetention)
 	server := &http.Server{
 		Addr:              cfg.Address,
 		Handler:           router,

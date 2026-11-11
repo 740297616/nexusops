@@ -36,3 +36,11 @@ type RefreshToken struct {
 }
 
 func (RefreshToken) TableName() string { return "auth_refresh_tokens" }
+
+type SessionInfo struct {
+	ID              int64     `json:"id"`
+	CreatedAt       time.Time `json:"created_at"`
+	AccessExpiresAt time.Time `json:"access_expires_at"`
+	ExpiresAt       time.Time `json:"expires_at"`
+	Current         bool      `json:"current"`
+}

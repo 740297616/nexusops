@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
 
 	"gorm.io/gorm"
@@ -11,6 +12,7 @@ import (
 
 var ErrUserNotFound = errors.New("user not found")
 var ErrInvalidRole = errors.New("unknown or disabled role")
+var ErrLastSuperAdmin = errors.New("cannot remove the last active super administrator")
 
 type Repository struct{ db *gorm.DB }
 
@@ -79,6 +81,9 @@ func (r *Repository) UserRoles(ctx context.Context, userID int64) ([]Role, error
 
 func (r *Repository) ReplaceRoles(ctx context.Context, actorID, userID int64, roleIDs []int64) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", int64(5640010231148)).Error; err != nil {
+			return err
+		}
 		var lockedID int64
 		if err := tx.Raw("SELECT id FROM users WHERE id = ? FOR UPDATE", userID).Scan(&lockedID).Error; err != nil {
 			return err
@@ -93,6 +98,25 @@ func (r *Repository) ReplaceRoles(ctx context.Context, actorID, userID int64, ro
 			}
 			if count != int64(len(roleIDs)) {
 				return ErrInvalidRole
+			}
+		}
+		var targetIsAdmin bool
+		if err := tx.Raw(`SELECT EXISTS(SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=? AND r.code='super_admin' AND r.status='active')`, userID).Scan(&targetIsAdmin).Error; err != nil {
+			return err
+		}
+		willBeAdmin := false
+		if len(roleIDs) > 0 {
+			if err := tx.Raw(`SELECT EXISTS(SELECT 1 FROM roles WHERE id IN ? AND code='super_admin' AND status='active')`, roleIDs).Scan(&willBeAdmin).Error; err != nil {
+				return err
+			}
+		}
+		if targetIsAdmin && !willBeAdmin {
+			var count int64
+			if err := tx.Raw(`SELECT count(*) FROM user_roles ur JOIN roles r ON r.id=ur.role_id JOIN users u ON u.id=ur.user_id WHERE r.code='super_admin' AND r.status='active' AND u.status='active'`).Scan(&count).Error; err != nil {
+				return err
+			}
+			if count <= 1 {
+				return ErrLastSuperAdmin
 			}
 		}
 		previous := []int64{}
@@ -115,6 +139,65 @@ func (r *Repository) ReplaceRoles(ctx context.Context, actorID, userID int64, ro
 		if err != nil {
 			return err
 		}
-		return tx.Exec("INSERT INTO rbac_audit_events (actor_user_id, target_user_id, action, previous_role_ids, new_role_ids) VALUES (?, ?, ?, ?::jsonb, ?::jsonb)", actorID, userID, "user_roles.replace", string(before), string(after)).Error
+		if err := tx.Exec("INSERT INTO rbac_audit_events (actor_user_id, target_user_id, action, previous_role_ids, new_role_ids) VALUES (?, ?, ?, ?::jsonb, ?::jsonb)", actorID, userID, "user_roles.replace", string(before), string(after)).Error; err != nil {
+			return err
+		}
+		return tx.Exec("INSERT INTO auth_audit_events (user_id, event_type, outcome, metadata) VALUES (?, ?, ?, ?::jsonb)", actorID, "user_roles_changed", "success", fmt.Sprintf(`{"target_user_id":%d,"previous_role_ids":%s,"new_role_ids":%s}`, userID, string(before), string(after))).Error
+	})
+}
+
+func (r *Repository) SetUserStatus(ctx context.Context, userID int64, status string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", int64(5640010231148)).Error; err != nil {
+			return err
+		}
+		var isAdmin bool
+		if err := tx.Raw(`SELECT EXISTS(SELECT 1 FROM users u JOIN user_roles ur ON ur.user_id=u.id JOIN roles r ON r.id=ur.role_id WHERE u.id=? AND u.status='active' AND r.code='super_admin' AND r.status='active')`, userID).Scan(&isAdmin).Error; err != nil {
+			return err
+		}
+		if isAdmin && status != "active" {
+			var count int64
+			if err := tx.Raw(`SELECT count(*) FROM users u JOIN user_roles ur ON ur.user_id=u.id JOIN roles r ON r.id=ur.role_id WHERE u.status='active' AND r.code='super_admin' AND r.status='active'`).Scan(&count).Error; err != nil {
+				return err
+			}
+			if count <= 1 {
+				return ErrLastSuperAdmin
+			}
+		}
+		return tx.Model(&authUserPlaceholder{}).Where("id=?", userID).Update("status", status).Error
+	})
+}
+
+type authUserPlaceholder struct{}
+
+func (authUserPlaceholder) TableName() string { return "users" }
+func (r *Repository) SetRoleStatus(ctx context.Context, roleID int64, status string) error {
+	return r.changeRole(ctx, roleID, status, false)
+}
+func (r *Repository) DeleteRole(ctx context.Context, roleID int64) error {
+	return r.changeRole(ctx, roleID, "", true)
+}
+func (r *Repository) changeRole(ctx context.Context, roleID int64, status string, remove bool) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", int64(5640010231148)).Error; err != nil {
+			return err
+		}
+		var code string
+		if err := tx.Raw("SELECT code FROM roles WHERE id=? FOR UPDATE", roleID).Scan(&code).Error; err != nil {
+			return err
+		}
+		if code == "super_admin" && (remove || status != "active") {
+			var count int64
+			if err := tx.Raw(`SELECT count(*) FROM users u JOIN user_roles ur ON ur.user_id=u.id JOIN roles r ON r.id=ur.role_id WHERE u.status='active' AND r.code='super_admin' AND r.status='active'`).Scan(&count).Error; err != nil {
+				return err
+			}
+			if count <= 1 {
+				return ErrLastSuperAdmin
+			}
+		}
+		if remove {
+			return tx.Exec("DELETE FROM roles WHERE id=?", roleID).Error
+		}
+		return tx.Exec("UPDATE roles SET status=?,updated_at=now() WHERE id=?", status, roleID).Error
 	})
 }

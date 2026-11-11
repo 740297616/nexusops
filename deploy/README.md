@@ -31,6 +31,8 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml run --rm --no
 
 不要将初始密码写入 Compose 文件或命令参数；容器运行时管理员环境仍可被 Docker 管理者读取。已存在管理员时初始化会失败。
 
+Phase 2.3 的 `NEXUSOPS_TRUSTED_PROXY_CIDRS` 只能填写实际可信反向代理的 CIDR；为空时忽略所有转发头。`AUTH_RATE_LIMIT_IP_MAX`、`AUTH_RATE_LIMIT_ACCOUNT_MAX` 和 `AUTH_RATE_LIMIT_WINDOW` 控制 PostgreSQL 共享登录限流，限流表不可用时登录返回 503。`AUTH_CLEANUP_INTERVAL`、`AUTH_SESSION_RETENTION` 和 `AUTH_AUDIT_RETENTION` 控制后台清理；清理由每个 Server 实例尝试执行，使用有限批次和幂等条件。生产环境应监控审计写入、限流存储和清理错误，并通过正式 HTTPS 入口保护这些接口。
+
 ## 开发
 
 开发覆盖文件以 Vite 替换 Nginx，绑定本地 `web/` 并启用文件轮询和热更新；Server 和 PostgreSQL 仍使用容器。两个配置使用相同项目和数据库卷，不应同时作为不同环境运行。

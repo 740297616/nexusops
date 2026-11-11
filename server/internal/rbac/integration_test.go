@@ -79,6 +79,9 @@ func TestRBACPostgres(t *testing.T) {
 		t.Fatalf("repeat up: %v %v", again, err)
 	}
 	service := NewService(NewRepository(db.GORM()))
+	if err := service.ReplaceRoles(ctx, legacy.ID, legacy.ID, []int64{}); !errors.Is(err, ErrLastSuperAdmin) {
+		t.Fatalf("last super admin protection: %v", err)
+	}
 	if allowed, err := service.HasPermission(ctx, legacy.ID, PermissionRoleManage); err != nil || !allowed {
 		t.Fatal("legacy admin not mapped")
 	}

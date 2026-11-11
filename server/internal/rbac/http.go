@@ -55,6 +55,8 @@ func errorResponse(c *gin.Context, err error) {
 		fail(c, http.StatusNotFound, "not_found", "User not found")
 	case errors.Is(err, ErrInvalidRole), errors.Is(err, ErrInvalidAssignment):
 		fail(c, http.StatusBadRequest, "invalid_request", "Invalid role assignment")
+	case errors.Is(err, ErrLastSuperAdmin):
+		fail(c, http.StatusConflict, "last_super_admin", "Cannot remove the last active super administrator")
 	default:
 		fail(c, http.StatusServiceUnavailable, "service_unavailable", "Authorization service unavailable")
 	}

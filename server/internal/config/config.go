@@ -18,6 +18,13 @@ type Database struct {
 type Config struct {
 	Address, Version string
 	Database         Database
+	Security         Security
+}
+
+type Security struct {
+	TrustedProxyCIDRs                                                  []string
+	RateLimitIPMax, RateLimitAccountMax                                int
+	RateLimitWindow, CleanupInterval, SessionRetention, AuditRetention time.Duration
 }
 
 func Load() (Config, error) {
@@ -45,6 +52,29 @@ func Load() (Config, error) {
 	if err := db.Validate(); err != nil {
 		return Config{}, err
 	}
+	security := Security{TrustedProxyCIDRs: splitEnv("NEXUSOPS_TRUSTED_PROXY_CIDRS"), RateLimitIPMax: 20, RateLimitAccountMax: 10}
+	if security.RateLimitIPMax, err = intEnv("AUTH_RATE_LIMIT_IP_MAX", "20"); err != nil {
+		return Config{}, err
+	}
+	if security.RateLimitAccountMax, err = intEnv("AUTH_RATE_LIMIT_ACCOUNT_MAX", "10"); err != nil {
+		return Config{}, err
+	}
+	if security.RateLimitWindow, err = durationEnv("AUTH_RATE_LIMIT_WINDOW", "1m"); err != nil {
+		return Config{}, err
+	}
+	if security.CleanupInterval, err = durationEnv("AUTH_CLEANUP_INTERVAL", "1h"); err != nil {
+		return Config{}, err
+	}
+	if security.SessionRetention, err = durationEnv("AUTH_SESSION_RETENTION", "24h"); err != nil {
+		return Config{}, err
+	}
+	if security.AuditRetention, err = durationEnv("AUTH_AUDIT_RETENTION", "2160h"); err != nil {
+		return Config{}, err
+	}
+	if security.RateLimitIPMax < 1 || security.RateLimitAccountMax < 1 || security.RateLimitWindow <= 0 || security.CleanupInterval <= 0 || security.SessionRetention < 0 || security.AuditRetention < 0 {
+		return Config{}, fmt.Errorf("security limits and cleanup durations must be valid")
+	}
+	cfg.Security = security
 	return cfg, nil
 }
 
@@ -89,4 +119,14 @@ func durationEnv(key, fallback string) (time.Duration, error) {
 		return 0, fmt.Errorf("%s must be a duration such as 5s or 30m", key)
 	}
 	return value, nil
+}
+func splitEnv(key string) []string {
+	parts := strings.Split(os.Getenv(key), ",")
+	values := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if value := strings.TrimSpace(part); value != "" {
+			values = append(values, value)
+		}
+	}
+	return values
 }

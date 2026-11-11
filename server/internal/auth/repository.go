@@ -132,11 +132,81 @@ func (r *Repository) Rotate(ctx context.Context, oldHash, accessHash, nextHash [
 		return time.Time{}, time.Time{}, err
 	}
 	if replayed {
-		return time.Time{}, time.Time{}, ErrInvalid
+		return time.Time{}, time.Time{}, ErrRefreshReplay
 	}
 	return accessExpires, refreshExpires, nil
 }
 
 func (r *Repository) Revoke(ctx context.Context, sessionID int64, now time.Time) error {
 	return r.db.WithContext(ctx).Model(&Session{}).Where("id = ? AND revoked_at IS NULL", sessionID).Update("revoked_at", now).Error
+}
+
+func (r *Repository) ListSessions(ctx context.Context, userID, currentID int64, now time.Time) ([]SessionInfo, error) {
+	items := []SessionInfo{}
+	err := r.db.WithContext(ctx).Raw(`SELECT id, created_at, access_expires_at, expires_at, (id = ?) AS current FROM auth_sessions WHERE user_id = ? AND revoked_at IS NULL AND expires_at > ? ORDER BY created_at DESC`, currentID, userID, now).Scan(&items).Error
+	return items, err
+}
+func (r *Repository) RevokeSession(ctx context.Context, userID, sessionID int64, now time.Time) error {
+	return r.db.WithContext(ctx).Model(&Session{}).Where("id = ? AND user_id = ? AND revoked_at IS NULL", sessionID, userID).Update("revoked_at", now).Error
+}
+func (r *Repository) RevokeOtherSessions(ctx context.Context, userID, currentID int64, now time.Time) error {
+	return r.db.WithContext(ctx).Model(&Session{}).Where("user_id = ? AND id <> ? AND revoked_at IS NULL", userID, currentID).Update("revoked_at", now).Error
+}
+func (r *Repository) Cleanup(ctx context.Context, now time.Time, sessionRetention, auditRetention time.Duration, batch int) (int64, error) {
+	var removed int64
+	cutoff := now.Add(-sessionRetention)
+	for {
+		result := r.db.WithContext(ctx).Exec(`DELETE FROM auth_refresh_tokens WHERE id IN (SELECT id FROM auth_refresh_tokens WHERE (expires_at < ? OR consumed_at < ?) ORDER BY id LIMIT ?)`, now, cutoff, batch)
+		if result.Error != nil {
+			return removed, result.Error
+		}
+		removed += result.RowsAffected
+		if result.RowsAffected < int64(batch) {
+			break
+		}
+	}
+	for {
+		result := r.db.WithContext(ctx).Exec(`DELETE FROM auth_sessions WHERE id IN (SELECT id FROM auth_sessions WHERE ((expires_at < ?) OR (revoked_at IS NOT NULL AND revoked_at < ?)) ORDER BY id LIMIT ?)`, now, cutoff, batch)
+		if result.Error != nil {
+			return removed, result.Error
+		}
+		removed += result.RowsAffected
+		if result.RowsAffected < int64(batch) {
+			break
+		}
+	}
+	if auditRetention > 0 {
+		for {
+			result := r.db.WithContext(ctx).Exec(`DELETE FROM auth_audit_events WHERE id IN (SELECT id FROM auth_audit_events WHERE created_at < ? ORDER BY id LIMIT ?)`, now.Add(-auditRetention), batch)
+			if result.Error != nil {
+				return removed, result.Error
+			}
+			removed += result.RowsAffected
+			if result.RowsAffected < int64(batch) {
+				break
+			}
+		}
+	}
+	return removed, nil
+}
+
+func (r *Repository) AllowLogin(ctx context.Context, ipKey, accountKey string, now time.Time, window time.Duration, ipMax, accountMax int) (bool, error) {
+	allowed := true
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for _, item := range []struct {
+			key string
+			max int
+		}{{ipKey, ipMax}, {accountKey, accountMax}} {
+			var within bool
+			if err := tx.Raw(`INSERT INTO auth_rate_limits (rate_key, window_started_at, attempts, updated_at) VALUES (?, ?, 1, ?) ON CONFLICT (rate_key) DO UPDATE SET window_started_at = CASE WHEN auth_rate_limits.window_started_at <= ? THEN EXCLUDED.window_started_at ELSE auth_rate_limits.window_started_at END, attempts = CASE WHEN auth_rate_limits.window_started_at <= ? THEN 1 ELSE auth_rate_limits.attempts + 1 END, updated_at = EXCLUDED.updated_at RETURNING attempts <= ?`, item.key, now, now, now.Add(-window), now.Add(-window), item.max).Scan(&within).Error; err != nil {
+				return err
+			}
+			if !within {
+				allowed = false
+				return nil
+			}
+		}
+		return nil
+	})
+	return allowed, err
 }
