@@ -1,6 +1,6 @@
 # NexusOps 监控 API 契约
 
-以下为 Phase 3.1.1 实现前的公共契约草案，统一使用现有 `{data,error}` 响应封装和 `/api/v1` 前缀。
+统一使用现有 `{data,error}` 响应封装和 `/api/v1` 前缀。
 
 ## Agent 上报
 
@@ -50,14 +50,16 @@
 需要用户 Bearer 认证和 `infrastructure:server:read`。返回每类指标的最近有效值及新鲜度：
 
 ```json
-{"data":{"server_id":"...","status":"online","observed_at":"...","stale":false,"metrics":[]},"error":null}
+{"data":{"server_id":"...","status":"online","observed_at":"...","last_sampled_at":"...","metrics_status":"fresh","stale":false,"metrics":[]},"error":null}
 ```
+
+`status` 是现有心跳状态，`metrics_status` 独立根据最后采样时间与 `METRICS_STALE_AFTER` 判断为 `fresh`、`stale` 或 `missing`；无数据时 `last_sampled_at` 为 `null`。`observed_at` 保持原来的接收时间语义。兼容字段 `stale` 在指标不新鲜或主机不在线时为 true；新客户端应分别使用 `status` 和 `metrics_status`。
 
 ### `GET /api/v1/servers/{id}/metrics/history`
 
-需要相同权限。参数：`metric_type`、`metric_name`、`interface`/`mountpoint`、`from`、`to`、`step`、`limit`。时间范围和点数有服务端上限；`step=raw` 只允许短时间范围，较长范围返回时间桶聚合。
+需要相同权限。必填 `metric_type`、`metric_name`，文件系统和网络还须分别提供 `mountpoint`、`interface`；`from`、`to` 为 RFC3339 时间，默认最近一小时。`step` 默认 `raw`，可选 `raw`、`5m`、`1h`，最大范围分别为 7、30、180 天；`limit` 默认及上限均为 2000。结果按时间升序，超出上限的点不会自动分页。
 
-响应包含 `series`、`sampled_at`、`received_at`、`aggregation` 和 `stale`。聚合数据明确标注 `avg`、`min`、`max` 或 `last`，Web 不得把聚合值显示为单次实时采样。
+响应的 `aggregation` 标识所选步长。聚合点的 `sampled_at` 为 UTC 桶起点，`last_sampled_at` 和 `received_at` 为桶内最后采样及其接收时间，`sample_count`、`min_value`、`max_value` 是有效样本的统计；`value` 对累计网络字节数为桶内最后计数，对其他指标为算术平均值。累计计数是计数器读数，不是桶内流量增量，不能跨重启/计数器回退直接相减。空桶不会生成 0 或伪造点；`missing_windows` 列出缺失的 UTC 桶起点，结果或检查窗口达到 `limit` 时 `truncated=true`，客户端需缩小时间范围继续查询。未结束或尚未聚合的桶也会显示为缺失。整个范围无数据时 `series` 为空且 `metrics_status=missing`。历史响应状态针对返回的范围，不能用作主机当前状态，应查询 latest。
 
 ## 权限与错误
 

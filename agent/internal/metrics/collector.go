@@ -16,11 +16,29 @@ import (
 )
 
 type Collector struct {
-	mu       sync.Mutex
-	previous map[string]NetworkCounter
+	mu        sync.Mutex
+	previous  map[string]NetworkCounter
+	providers providers
 }
 
-func NewCollector() *Collector { return &Collector{previous: map[string]NetworkCounter{}} }
+type providers struct {
+	cpuPercent func(context.Context, time.Duration, bool) ([]float64, error)
+	cpuCounts  func(context.Context, bool) (int, error)
+	load       func(context.Context) (*load.AvgStat, error)
+	memory     func(context.Context) (*mem.VirtualMemoryStat, error)
+	partitions func(context.Context, bool) ([]disk.PartitionStat, error)
+	diskUsage  func(context.Context, string) (*disk.UsageStat, error)
+	network    func(context.Context, bool) ([]net.IOCountersStat, error)
+}
+
+func NewCollector() *Collector {
+	return &Collector{previous: map[string]NetworkCounter{}, providers: providers{
+		cpuPercent: cpu.PercentWithContext, cpuCounts: cpu.CountsWithContext,
+		load: load.AvgWithContext, memory: mem.VirtualMemoryWithContext,
+		partitions: disk.PartitionsWithContext, diskUsage: disk.UsageWithContext,
+		network: net.IOCountersWithContext,
+	}}
+}
 
 func (c *Collector) Collect(ctx context.Context) (Batch, error) {
 	now := time.Now().UTC()
@@ -32,24 +50,24 @@ func (c *Collector) Collect(ctx context.Context) (Batch, error) {
 		}
 		batch.Samples = append(batch.Samples, Sample{MetricType: metricType, MetricName: name, Labels: labels, Value: value, Unit: unit})
 	}
-	if values, err := cpu.PercentWithContext(ctx, 0, false); err == nil && len(values) > 0 {
+	if values, err := c.providers.cpuPercent(ctx, 0, false); err == nil && len(values) > 0 {
 		add("cpu", "usage_percent", nil, values[0], "percent")
 	} else if err != nil {
 		errs = append(errs, "cpu usage")
 	}
-	if cores, err := cpu.CountsWithContext(ctx, true); err == nil {
+	if cores, err := c.providers.cpuCounts(ctx, true); err == nil {
 		add("cpu", "cores", nil, float64(cores), "count")
 	} else {
 		errs = append(errs, "cpu cores")
 	}
-	if avg, err := load.AvgWithContext(ctx); err == nil {
+	if avg, err := c.providers.load(ctx); err == nil {
 		add("cpu", "load_1m", nil, avg.Load1, "load")
 		add("cpu", "load_5m", nil, avg.Load5, "load")
 		add("cpu", "load_15m", nil, avg.Load15, "load")
 	} else {
 		errs = append(errs, "load")
 	}
-	if value, err := mem.VirtualMemoryWithContext(ctx); err == nil {
+	if value, err := c.providers.memory(ctx); err == nil {
 		add("memory", "total_bytes", nil, float64(value.Total), "bytes")
 		add("memory", "used_bytes", nil, float64(value.Used), "bytes")
 		add("memory", "available_bytes", nil, float64(value.Available), "bytes")
@@ -57,9 +75,9 @@ func (c *Collector) Collect(ctx context.Context) (Batch, error) {
 	} else {
 		errs = append(errs, "memory")
 	}
-	if partitions, err := disk.PartitionsWithContext(ctx, false); err == nil {
+	if partitions, err := c.providers.partitions(ctx, false); err == nil {
 		for _, part := range partitions {
-			usage, usageErr := disk.UsageWithContext(ctx, part.Mountpoint)
+			usage, usageErr := c.providers.diskUsage(ctx, part.Mountpoint)
 			if usageErr != nil {
 				continue
 			}
@@ -71,9 +89,10 @@ func (c *Collector) Collect(ctx context.Context) (Batch, error) {
 	} else {
 		errs = append(errs, "filesystem")
 	}
-	if counters, err := net.IOCountersWithContext(ctx, true); err == nil {
+	if counters, err := c.providers.network(ctx, true); err == nil {
 		c.mu.Lock()
 		defer c.mu.Unlock()
+		next := make(map[string]NetworkCounter, len(counters))
 		for _, value := range counters {
 			key := value.Name
 			current := NetworkCounter{RXBytes: value.BytesRecv, TXBytes: value.BytesSent, At: now}
@@ -87,8 +106,9 @@ func (c *Collector) Collect(ctx context.Context) (Batch, error) {
 					add("network", "tx_bytes_per_second", labels, tx, "bytes_per_second")
 				}
 			}
-			c.previous[key] = current
+			next[key] = current
 		}
+		c.previous = next
 	} else {
 		errs = append(errs, "network")
 	}

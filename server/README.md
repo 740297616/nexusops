@@ -95,6 +95,8 @@ group.GET("/example", auth.RequireAuthentication(authService), rbac.RequirePermi
 
 Agent 安全配置：`AGENT_HEARTBEAT_TIMEOUT`（默认 2m）、`AGENT_REGISTRATION_TTL`（默认 15m）、`AGENT_RATE_LIMIT_WINDOW`（默认 1m）、`AGENT_REGISTER_RATE_LIMIT`（默认每 IP 10 次）、`AGENT_HEARTBEAT_RATE_LIMIT`（默认每 Agent 120 次）和 `AGENT_REPORT_RATE_LIMIT`（默认每 Agent 30 次）。限流状态存储在 PostgreSQL，所有 Server 实例共享。
 
-指标配置：`AGENT_METRICS_RATE_LIMIT`（默认每 Agent 60 次/窗口）、`METRICS_CLEANUP_INTERVAL`（默认 1h）和 `METRICS_RAW_RETENTION`（默认 168h）。当前实现保存原始指标，5 分钟和 1 小时聚合留待后续阶段。
+指标配置：`AGENT_METRICS_RATE_LIMIT`（默认每 Agent 60 次/窗口）、`METRICS_CLEANUP_INTERVAL`（默认 1h）、`METRICS_STALE_AFTER`（默认 2m）、`METRICS_RAW_RETENTION`（168h）、`METRICS_5M_RETENTION`（720h）及 `METRICS_1H_RETENTION`（4320h）。Agent 采集间隔由 Agent 的 `NEXUSOPS_AGENT_METRICS_INTERVAL` 配置；应将过期阈值设得高于采集间隔并考虑网络延迟和时钟偏差。
 
-Phase 3.1.1 提供 Agent 指标上报 `POST /api/v1/agent/metrics`，以及管理员查询 `/api/v1/servers/{id}/metrics/latest` 和 `/metrics/history`。当前历史查询只支持 `step=raw`，原始指标默认保留 7 天；聚合数据和监控 Web 页面留待后续阶段。
+Agent 上报 `POST /api/v1/agent/metrics`；管理员通过 `/api/v1/servers/{id}/metrics/latest` 和 `/metrics/history` 查询。历史支持 `step=raw`、`5m`、`1h`；指标状态独立于心跳状态。聚合口径、保留策略、查询限制及性能注意事项见 `docs/architecture/monitoring.md` 与 `monitoring-api.md`。监控 Web 页面留待后续阶段。
+
+指标 PostgreSQL 回归可在已迁移的**专用、可丢弃数据库**设置 `NEXUSOPS_METRICS_INTEGRATION=1` 执行 `go test ./internal/monitoring -run TestMonitoringPostgres -count=1 -v`。性能实验以同样的隔离前提设置 `NEXUSOPS_METRICS_PERF=1` 并运行 `TestMetricPerformance`；可设置 `NEXUSOPS_METRICS_PERF_AGENTS` 和 `NEXUSOPS_METRICS_PERF_SAMPLES`，测试会对整个数据库执行清理，严禁用于开发或生产数据库。

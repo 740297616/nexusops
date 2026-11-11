@@ -54,3 +54,17 @@ func TestSecurityConfig(t *testing.T) {
 		t.Fatalf("unexpected security config: %+v", cfg.Security)
 	}
 }
+
+func TestMetricsConfig(t *testing.T) {
+	for key, value := range map[string]string{"DB_USER": "user", "DB_PASSWORD": "password", "DB_NAME": "db", "METRICS_STALE_AFTER": "3m", "METRICS_5M_RETENTION": "720h", "METRICS_1H_RETENTION": "4320h"} {
+		t.Setenv(key, value)
+	}
+	cfg, err := Load()
+	if err != nil || cfg.Security.MetricsStaleAfter != 3*time.Minute || cfg.Security.Metrics5mRetention != 720*time.Hour || cfg.Security.Metrics1hRetention != 4320*time.Hour {
+		t.Fatalf("invalid metrics configuration: %+v %v", cfg.Security, err)
+	}
+	t.Setenv("METRICS_STALE_AFTER", "0s")
+	if _, err := Load(); err == nil {
+		t.Fatal("zero stale threshold accepted")
+	}
+}

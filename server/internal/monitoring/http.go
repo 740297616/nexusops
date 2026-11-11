@@ -172,7 +172,19 @@ func (h *handler) history(c *gin.Context) {
 			return
 		}
 	}
-	if to.Before(from) || to.Sub(from) > 7*24*time.Hour {
+	step := c.DefaultQuery("step", "raw")
+	maxRange := 7 * 24 * time.Hour
+	switch step {
+	case "raw":
+	case "5m":
+		maxRange = 30 * 24 * time.Hour
+	case "1h":
+		maxRange = 180 * 24 * time.Hour
+	default:
+		fail(c, 400, "invalid_request", "Invalid history step")
+		return
+	}
+	if to.Before(from) || to.Sub(from) > maxRange {
 		fail(c, 400, "invalid_request", "Invalid time range")
 		return
 	}
@@ -183,11 +195,6 @@ func (h *handler) history(c *gin.Context) {
 			fail(c, 400, "invalid_request", "Invalid limit")
 			return
 		}
-	}
-	step := c.DefaultQuery("step", "raw")
-	if step != "raw" {
-		fail(c, 400, "invalid_request", "Only raw history is available until rollups are implemented")
-		return
 	}
 	labelKey, labelValue := "", ""
 	if metricType == "filesystem" {
@@ -200,7 +207,7 @@ func (h *handler) history(c *gin.Context) {
 		fail(c, 400, "invalid_request", "A resource label is required")
 		return
 	}
-	value, err := h.service.History(c, id, server.Status, metricType, metricName, labelKey, labelValue, from, to, limit)
+	value, err := h.service.History(c, id, server.Status, metricType, metricName, labelKey, labelValue, step, from, to, limit)
 	if errors.Is(err, ErrInvalid) {
 		fail(c, 400, "invalid_request", "Invalid metric query")
 		return

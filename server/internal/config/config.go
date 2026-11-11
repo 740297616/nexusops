@@ -22,14 +22,15 @@ type Config struct {
 }
 
 type Security struct {
-	TrustedProxyCIDRs                                                     []string
-	RateLimitIPMax, RateLimitAccountMax                                   int
-	RateLimitWindow, CleanupInterval, SessionRetention, AuditRetention    time.Duration
-	AgentHeartbeatTimeout, AgentRegistrationTTL                           time.Duration
-	AgentRateLimitWindow                                                  time.Duration
-	AgentRegisterRateLimit, AgentHeartbeatRateLimit, AgentReportRateLimit int
-	AgentMetricsRateLimit                                                 int
-	MetricsCleanupInterval, MetricsRawRetention                           time.Duration
+	TrustedProxyCIDRs                                                                   []string
+	RateLimitIPMax, RateLimitAccountMax                                                 int
+	RateLimitWindow, CleanupInterval, SessionRetention, AuditRetention                  time.Duration
+	AgentHeartbeatTimeout, AgentRegistrationTTL                                         time.Duration
+	AgentRateLimitWindow                                                                time.Duration
+	AgentRegisterRateLimit, AgentHeartbeatRateLimit, AgentReportRateLimit               int
+	AgentMetricsRateLimit                                                               int
+	MetricsCleanupInterval, MetricsRawRetention, Metrics5mRetention, Metrics1hRetention time.Duration
+	MetricsStaleAfter                                                                   time.Duration
 }
 
 func Load() (Config, error) {
@@ -100,10 +101,19 @@ func Load() (Config, error) {
 	if security.MetricsCleanupInterval, err = durationEnv("METRICS_CLEANUP_INTERVAL", "1h"); err != nil {
 		return Config{}, err
 	}
+	if security.MetricsStaleAfter, err = durationEnv("METRICS_STALE_AFTER", "2m"); err != nil {
+		return Config{}, err
+	}
 	if security.MetricsRawRetention, err = durationEnv("METRICS_RAW_RETENTION", "168h"); err != nil {
 		return Config{}, err
 	}
-	if security.RateLimitIPMax < 1 || security.RateLimitAccountMax < 1 || security.RateLimitWindow <= 0 || security.CleanupInterval <= 0 || security.SessionRetention < 0 || security.AuditRetention < 0 || security.AgentHeartbeatTimeout <= 0 || security.AgentRegistrationTTL <= 0 || security.AgentRateLimitWindow <= 0 || security.AgentRegisterRateLimit < 1 || security.AgentHeartbeatRateLimit < 1 || security.AgentReportRateLimit < 1 || security.AgentMetricsRateLimit < 1 || security.MetricsCleanupInterval <= 0 || security.MetricsRawRetention <= 0 {
+	if security.Metrics5mRetention, err = durationEnv("METRICS_5M_RETENTION", "720h"); err != nil {
+		return Config{}, err
+	}
+	if security.Metrics1hRetention, err = durationEnv("METRICS_1H_RETENTION", "4320h"); err != nil {
+		return Config{}, err
+	}
+	if security.RateLimitIPMax < 1 || security.RateLimitAccountMax < 1 || security.RateLimitWindow <= 0 || security.CleanupInterval <= 0 || security.SessionRetention < 0 || security.AuditRetention < 0 || security.AgentHeartbeatTimeout <= 0 || security.AgentRegistrationTTL <= 0 || security.AgentRateLimitWindow <= 0 || security.AgentRegisterRateLimit < 1 || security.AgentHeartbeatRateLimit < 1 || security.AgentReportRateLimit < 1 || security.AgentMetricsRateLimit < 1 || security.MetricsCleanupInterval <= 0 || security.MetricsStaleAfter <= 0 || security.MetricsRawRetention <= 0 || security.Metrics5mRetention <= 0 || security.Metrics1hRetention <= 0 {
 		return Config{}, fmt.Errorf("security limits and cleanup durations must be valid")
 	}
 	cfg.Security = security

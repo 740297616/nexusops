@@ -45,7 +45,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-client
-          for db in nexusops_ci_auth nexusops_ci_rbac; do
+          for db in nexusops_ci_auth nexusops_ci_rbac nexusops_ci_metrics; do
             PGPASSWORD=nexusops_ci_password psql -h 127.0.0.1 -U nexusops -d nexusops_ci_base -v ON_ERROR_STOP=1 -c "CREATE DATABASE $db";
           done
       - name: PostgreSQL integration tests
@@ -60,6 +60,18 @@ jobs:
           DB_NAME: nexusops_ci_base
           DB_SSLMODE: disable
         run: go test -count=1 ./...
+      - name: Monitoring PostgreSQL regression
+        env:
+          NEXUSOPS_METRICS_INTEGRATION: "1"
+          DB_HOST: 127.0.0.1
+          DB_PORT: "5432"
+          DB_USER: nexusops
+          DB_PASSWORD: nexusops_ci_password
+          DB_NAME: nexusops_ci_metrics
+          DB_SSLMODE: disable
+        run: |
+          go run ./cmd/migrate up
+          go test -count=1 ./internal/monitoring -run TestMonitoringPostgres
       - name: Build
         run: go build ./...
 

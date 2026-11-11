@@ -81,15 +81,7 @@ func runMetrics(ctx context.Context, c *client.Client, cfg config.Config) {
 				if len(batch.Samples) == 0 {
 					continue
 				}
-				select {
-				case queue <- batch:
-				default:
-					select {
-					case <-queue:
-					default:
-					}
-					queue <- batch
-				}
+				enqueueMetric(queue, batch)
 			case <-ctx.Done():
 				close(queue)
 				return
@@ -100,5 +92,18 @@ func runMetrics(ctx context.Context, c *client.Client, cfg config.Config) {
 		if err := c.ReportMetrics(ctx, batch); err != nil {
 			log.Printf("metrics report failed: %v", err)
 		}
+	}
+}
+
+// enqueueMetric has one producer and retains the newest batch when full.
+func enqueueMetric(queue chan metrics.Batch, batch metrics.Batch) {
+	select {
+	case queue <- batch:
+	default:
+		select {
+		case <-queue:
+		default:
+		}
+		queue <- batch
 	}
 }

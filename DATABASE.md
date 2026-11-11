@@ -54,6 +54,8 @@
 
 `00007_agent_security.sql` 创建 PostgreSQL 共享的 `agent_rate_limits`，并增加服务器分组/标签管理权限。Agent 限流使用原子 UPSERT，在多实例下共享窗口和计数；回滚只删除该版本新增的表和权限。
 
-Phase 3.1 监控指标的逻辑模型、索引、聚合和保留策略见 [docs/architecture/monitoring.md](docs/architecture/monitoring.md)。在 3.1.1 实现前不创建指标 Migration；新的指标表必须通过独立 Goose Migration，并验证批量写入、查询、清理和回滚。
+Phase 3.1 监控指标的逻辑模型、索引、聚合和保留策略见 [docs/architecture/monitoring.md](docs/architecture/monitoring.md)。新增指标表必须通过独立 Goose Migration，并验证批量写入、查询、清理和回滚。
 
-`00008_metrics.sql` 创建原始监控批次及 CPU/内存、文件系统、网络明细表，使用 Agent 凭据和请求 ID 关联主机并保证重复请求幂等。当前只实现原始样本保留和清理，5 分钟/1 小时聚合表留待后续迁移。
+`00008_metrics.sql` 创建原始监控批次及 CPU/内存、文件系统、网络明细表，使用 Agent 凭据和请求 ID 关联主机并保证重复请求幂等。原始样本默认保留 7 天，明细通过外键级联清理。
+
+`00009_metric_rollups.sql` 创建 5 分钟和 1 小时 UTC 时间桶聚合表，聚合任务使用 UPSERT 幂等更新；5 分钟默认保留 30 天，1 小时默认保留 180 天。原始样本仍默认保留 7 天，因此 1 小时聚合只能从现有原始窗口持续生成，历史回填需另行规划。

@@ -92,14 +92,14 @@ func TestPostgresIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	statuses, err := provider.Status(ctx)
-	if err != nil || len(statuses) != 8 || !allMigrationState(statuses, goose.StatePending) {
+	if err != nil || len(statuses) != 9 || !allMigrationState(statuses, goose.StatePending) {
 		t.Fatalf("expected a fresh isolated database: %v %v", statuses, err)
 	}
 	results, err := provider.Up(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(results) != 8 {
+	if len(results) != 9 {
 		t.Fatalf("expected fresh isolated database, got %d migrations", len(results))
 	}
 	results, err = provider.Up(ctx)
@@ -107,14 +107,14 @@ func TestPostgresIntegration(t *testing.T) {
 		t.Fatalf("repeated up: %v %v", results, err)
 	}
 	statuses, err = provider.Status(ctx)
-	if err != nil || len(statuses) != 8 || !allMigrationState(statuses, goose.StateApplied) {
+	if err != nil || len(statuses) != 9 || !allMigrationState(statuses, goose.StateApplied) {
 		t.Fatalf("status: %v %v", statuses, err)
 	}
 	if _, err := provider.Down(ctx); err != nil {
 		t.Fatal(err)
 	}
 	statuses, err = provider.Status(ctx)
-	if err != nil || len(statuses) != 8 || statuses[7].State != goose.StatePending || !allMigrationState(statuses[:7], goose.StateApplied) {
+	if err != nil || len(statuses) != 9 || statuses[8].State != goose.StatePending || !allMigrationState(statuses[:8], goose.StateApplied) {
 		t.Fatalf("down status: %v %v", statuses, err)
 	}
 	if _, err := provider.Up(ctx); err != nil {
